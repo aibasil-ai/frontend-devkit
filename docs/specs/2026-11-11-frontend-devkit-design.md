@@ -111,7 +111,7 @@
 | `無` | **已確認本專案沒有該事物**（例如真的沒有 lint） | 跳過，回報寫「依設定檔：本專案無 lint gate」 | **不適用，不擋 PASS**；但不得宣稱跑過該 gate |
 | `TBD（未確認）` | 不知道、沒掃到、還沒問 | 跳過，回報列出「因 TBD 未覆蓋：X」 | **不擋 PASS**，但 PASS 的涵蓋範圍必須被如實標明；開發者與審核者都不得把 TBD 當「沒有風險」 |
 
-> `無` 與 `TBD` 的差別是**知識狀態**，不是檢查结果：`無`＝確認不存在（該項永遠不適用）；`TBD`＝確認不知道（本輪沒查）。兩者都不構成 FAIL，但 `TBD` 必須在回報中留下未覆蓋紀錄，讓你知道 PASS 的邊界在哪。
+> `無` 與 `TBD` 的差別是**知識狀態**，不是檢查結果：`無`＝確認不存在（該項永遠不適用）；`TBD`＝確認不知道（本輪沒查）。兩者都不構成 FAIL，但 `TBD` 必須在回報中留下未覆蓋紀錄，讓你知道 PASS 的邊界在哪。
 
 ---
 
@@ -180,7 +180,7 @@ frontend-devkit/
 ```
 <專案>/.opencode/frontend-devkit/project.md      你維護（建議進版控）
 <專案>/.opencode/frontend-devkit/resolved.md     init 產出（建議進版控，可 diff）
-<專案>/<設定檔>                                  追加 instructions、shell 權限、model（既有欄位不覆蓋）
+<專案>/<設定檔>                                  追加 instructions 與 model（既有欄位不覆蓋）。**方案 B 下不得在此寫 shell 規則**；`inspect` 若偵測到 `agents.<id>.permissions` 含 shell 條目 → 警告「與方案 B 矛盾，且依 experiments 第 3 題此類 allow 不會生效」
 ```
 
 `<設定檔>` 有兩種合法形式（`opencode.json(c)` 於專案根，或 `.opencode/opencode.json(c)`），官方規則：`.opencode` 內的設定**覆蓋**根目錄的同名設定，且建議一棵樹只用一種。所以：
@@ -273,14 +273,14 @@ frontend-devkit/
 | `git ls-files *` | 查檔案清單 |
 | `npx prettier --check *` | 格式檢查（**不可** `--write`） |
 
-> 這一欄的存在理由：developer 的 shell 採「未列即詢問」（D14），合法但少見的唯讀指令要在這裡白名單化，否則你一直被問。**寫入範圍（第 3 輪殘留漏洞 #3）**：這一欄**只追加到 developer 的規則節點**；reviewer 若需要額外指令，一律走 §8.1 的專案端 gate 逐條批准，否則「唯讀最小集」會被這欄悄悄撐大。寫進設定檔時一樣走 §7.3.5 的寫入性檢查與逐條批准——**人填的條目也不得直接變成 allow**，否則這一欄會變成 I-2 的旁路（例：有人填 `npm install *`，而 developer 的第 2 段 deny 必須壓在它上面）。
+> 這一欄的存在理由：developer 的 shell 採「未列即詢問」（D14），合法但少見的唯讀指令要在這裡白名單化，否則你一直被問。**方案 B 下的定義（第 5 輪改正：這一欄不再是授權來源）**：① 它是 developer 的「詢問預期清單」——清單內指令首次執行時你選 `Allow always`，官方會存成專案級持久 allow（§7.3.1 事實 7），這是 B 下 developer 唯一合法的擴充路徑；② 給 `compile` 判斷「哪些 gate 需人工執行」。**reviewer 不能靠這欄擴張**（它的地板是 deny，而持久 allow 蓋不掉設定 deny），需要新指令只能改 kit 主體清單並升級。寫進設定檔時一樣走 §7.3.5 的寫入性檢查與逐條批准——**人填的條目也不得直接變成 allow**，否則這一欄會變成 I-2 的旁路（例：有人填 `npm install *`，而 developer 的第 2 段 deny 必須壓在它上面）。
 
 ## 安裝紀錄（setup 維護，compile 重譯時保留）
 | 項目 | 值 |
 |---|---|
 | 上次 `probe` 日期／OpenCode 版本 | 2026-11-11／v2.2.7 |
-| probe 第 1 條（專案端 gate allow）結果 | allow |
-| probe 第 2 條（必被拒的寫入指令）結果 | deny |
+| probe 第 0 條 `Get-Location` 落點＝本專案？ | 是 |
+| probe 第 1 條（靜態清單 gate，如 `npm test`）／第 2 條（寫入指令）結果 | allow／deny |
 ```
 
 ### 5.1 init 的偵測對應（可機械偵測的欄位）
@@ -296,15 +296,15 @@ frontend-devkit/
 | `locales/`、`lang/`、`i18n/`、`*.json` 語系樣板 | `i18n` pack 建議、語系檔路徑 |
 | 框架指標（`nuxt`、`vue`+`@vitejs/plugin-vue`、`next`、`react`） | 建議啟用的 `stack/*` pack |
 | `.env*` 檔名 | `環境檔` |
-| `$PSVersionTable` 探針（唯一可行做法，見下方「shell 探測」） | `shell`；主工作區用 `git rev-parse --show-toplevel` 取得但**只用作執行期變數，絕不落盤** |
+| `$env:OS`／`$PSVersionTable` 這類含 `$` 的寫法**不可用**（第 8 題實測 DENIED）；探針用 `Get-Location` 精確形 | `shell`；主工作區用 `git rev-parse --show-toplevel` 取得但**只用作執行期變數，絕不落盤** |
 | 既有 `dangerouslySetInnerHTML`／`v-html`／`innerHTML`／DOMPurify／sanitize 字串搜尋 | `安全慣例` 候選值（仍需你確認，掃到不代表正確） |
 
 偵測結果一律標註來源：`(偵測自 package.json scripts.test)`，讓你分得清哪些是猜的、哪些是你答的。
 
 ### 5.1.1 五個偵測細節（第 1 輪審核補）
 
-1. **`shell` 欄的循環問題**：不能用 `$env:OS` 或 `Get-Content` 之類去「判斷 shell 是什麼」，因為那些指令只有在目標 shell 已經成立時才跑得起來。kit 的定義：`shell` ＝ **OpenCode 的 shell 工具實際運行的環境**。**探針寫法依 `docs/experiments.md` 第 8 題定稿**：用 `Get-Location`（PowerShell 独有 cmdlet，無 `$`、無括號；實測 EXECUTED 會回傳目前路徑）→ 成功回傳路徑形如 `Path ---- C:\...` 即記 `powershell`；若它「不是內部或外部命令」之類錯誤 → 記 `TBD` 並用 `question` 請你確認。可用 `cmd /c ver` 交叉確認 Windows（實測回 `Microsoft Windows [Version …]`）。**禁止**用 `Write-Output $PSVersionTable.PSVersion.ToString()` 這類含 `$` 變數成員存取或括號子運算式的寫法——**實測會被 scanner 判為無法安全分析而 DENIED**（即使 `Write-Output *` 已在白名單）。非 PowerShell 時 kit 的 worktree 程序無法執行，流程停止（§11）。不承諾探測 POSIX（本次非目標），也不得用「假設是 Windows」瞞過去。
-   > 附帶教訓（`experiments.md` 二.1）：`opencode run` 的 shell 在 **service 綁定的專案目錄**執行，不是呼叫端 cwd。所以 `Get-Location` 的回傳值不只用來判 shell，也要用來**確認實驗／操作真的落在预期專案**；對 profile 記錄而言只取「是否 PowerShell」這個結論，**路徑本身絕不落盤**。
+1. **`shell` 欄的循環問題**：不能用 `$env:OS` 或 `Get-Content` 之類去「判斷 shell 是什麼」，因為那些指令只有在目標 shell 已經成立時才跑得起來。kit 的定義：`shell` ＝ **OpenCode 的 shell 工具實際運行的環境**。**探針寫法依 `docs/experiments.md` 第 8 題定稿**：用 `Get-Location`（PowerShell 獨有 cmdlet，無 `$`、無括號；實測 EXECUTED 會回傳目前路徑）→ 成功回傳路徑形如 `Path ---- C:\...` 即記 `powershell`；若它「不是內部或外部命令」之類錯誤 → 記 `TBD` 並用 `question` 請你確認。可用 `cmd /c ver` 交叉確認 Windows（實測回 `Microsoft Windows [Version …]`）。**禁止**用 `Write-Output $PSVersionTable.PSVersion.ToString()` 這類含 `$` 變數成員存取或括號子運算式的寫法——**實測會被 scanner 判為無法安全分析而 DENIED**（即使 `Write-Output *` 已在白名單）。非 PowerShell 時 kit 的 worktree 程序無法執行，流程停止（§11）。不承諾探測 POSIX（本次非目標），也不得用「假設是 Windows」瞞過去。
+   > 附帶教訓（`experiments.md` 二.1）：`opencode run` 的 shell 在 **service 綁定的專案目錄**執行，不是呼叫端 cwd。所以 `Get-Location` 的回傳值不只用來判 shell，也要用來**確認實驗／操作真的落在預期專案**；對 profile 記錄而言只取「是否 PowerShell」這個結論，**路徑本身絕不落盤**。
 2. **`設定檔路徑` 偵測**：檢查根 `opencode.json(c)` 與 `.opencode/opencode.json(c)` 是否存在；只有一個 → 用它；兩個都有 → `question` 請你選並說明「`.opencode` 蓋根目錄」；都沒有 → 預設 `.opencode/opencode.json`。
 3. **gate 指令必須先展開再判定**（§7.3.5）：`scripts.lint` 之類不能照字面 allow，`setup` 要讀出 script 本體（例 `eslint --ext .js,.vue --fix .`）逐條檢查有無寫入性選項，疑似可寫入者不自動 allow。
 4. **worktree 目錄是否被 ignore**：用 `git check-ignore -q <worktree 目錄>` 檢查；未被 ignore 時要警告——`--working` 審核會把 worktree 內容（含複製進去、可能帶密鍵的 `.env`）混入未追蹤檔案清單，且容易誤 commit。建議值：把 `.worktrees/` 加進 `.gitignore`（**由你改，init 只建議**）。
@@ -321,7 +321,7 @@ frontend-devkit/
 | `worktree 目錄` | 專案內相對路徑；**不得**含 `..`、`~`、盤符（`C:`）、開頭 `/` 或 `\`；不得是 `.git` 或 `.opencode` 本身 | 填 `../x` → §9 程序折進 resolved 後，`git worktree add` 會在**專案外**建立工作區，並把可能含密鍵的 `.env` 複製到專案外（orchestrator 的 `git worktree add *` 本身不限前綴，所以只能靠這欄驗） |
 | `環境檔` | 單一檔名（可多檔、逐檔列）；**不得**含 `/`、`\`、`:`、`..`、萬用字元 | 含路徑或外部檔 → `Copy-Item <環境檔> .worktrees/…` 變成「從任意來源複製任意檔」，可被用來把機密檔搬進工作區再讀取 |
 
-另外兩欄採**格式**驗證（非白名單）：`worktreePolicy` ∈｛`ask`,`always`,`never`｝、`depStrategy` ∈｛`junction`,`install-per-worktree`,`none`｝、`shell` ∈｛`powershell`,`TBD`｝；`預設審核範圍` 必須是 §8 認得的範圍語法之一。
+另外四欄採**格式**驗證（非白名單）：`worktreePolicy` ∈｛`ask`,`always`,`never`｝、`depStrategy` ∈｛`junction`,`install-per-worktree`,`none`｝、`shell` ∈｛`powershell`,`TBD`｝；`預設審核範圍` 必須是 §8 認得的範圍語法之一。
 
 > **同一輪也補齊 §7.3.5#2 的「寫入性」清單（原本只有 `--fix` 類旗標）**：`## 指令` 或 `## 額外 shell` 若填 `rm *`、`del`、`Remove-Item`、`Move-Item`、`Rename-Item`、`Set-Content`、`New-Item`（非 junction 用）、`icacls`、`Invoke-Expression`、`iex` 這類**檔案系統寫刪／任意程式執行**指令，一律視為可寫入而**拒絕 allow**；reviewer 節點的專案端 allow 另加一句限定：「僅測試／lint／build／唯讀工具類」。
 
@@ -356,7 +356,7 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 ### 6.3 `resolved.md`（編譯產物）
 
-由 `/frontend-devkit/init compile` 產生，內容為啟用 pack 的檢查項合併結果 **+ 參數化後的 worktree 程序段落**（D15），檔頭記錄：profile 路徑、啟用清單、每個 pack 的 sha256 前 8 碼、產生時間、kit 版本（kit repo 的 `git rev-parse --short HEAD`）、OpenCode 版本、以及「上次 probe：日期／結果」的**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，见 §8.2 第 4 點——產物檔不存會被重譯抹掉的資料）。
+由 `/frontend-devkit/init compile` 產生，內容為啟用 pack 的檢查項合併結果 **+ 參數化後的 worktree 程序段落**（D15），檔頭記錄：**權限模式（A／B；現行預設 B，§7.3.0.1#4）**、profile 路徑、啟用清單、每個 pack 的 sha256 前 8 碼、產生時間、kit 版本（kit repo 的 `git rev-parse --short HEAD`）、OpenCode 版本、以及「上次 probe：日期／結果」的**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，見 §8.2 第 4 點——產物檔不存會被重譯抹掉的資料）。
 
 主體鐵則（**只用 `read` 就能執行，不要求 agent 會算雜湊**）：`resolved.md` 不存在，或其檔頭的「啟用清單」與 `project.md` 的 `## 啟用規則` 不一致 → **停止並提示重跑 compile**，不得靜默使用舊產物。
 
@@ -381,10 +381,10 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 | agent | mode | `edit` | `shell` 基礎 | 其他工具 | 可起 subagent | 核心鐵則 |
 |---|---|---|---|---|---|---|
-| `frontend-devkit/orchestrator` | primary | `{"action":"edit","resource":"*","effect":"deny"}` | `ask` 起頭 → allow：`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git branch *`、`git worktree add *`、`git worktree list`、`git add *`、`Test-Path *`、**具名到 worktree 的寫入／刪除通道**：`New-Item -ItemType Junction -Path .worktrees/*`、`Resolve-Path node_modules`（精確形）、`Copy-Item * .worktrees/*`、`cmd /c rmdir .worktrees/*` → 再掛 `git commit *`、`git merge *`、`git worktree remove *`、`git branch -D *` 為 **ask** → **結尾三段式**（§7.1 定义：第 1 段真地板 `git push *`／`git rebase *`／`git reset *`／`git checkout *`／`git switch *`／`git clean *`／`git stash *`／`git worktree prune *`；第 2 段可變依賴家族；**第 3 段不可變例外 allow `npm ci *`、`pnpm install --frozen-lockfile *`、`yarn install --frozen-lockfile *`，必須排在第 2 段之後**，否則 §9.3 的 `install-per-worktree` 會被自己翻回 deny） | `question` allow；`skill` deny；`webfetch` deny | 僅 `frontend-devkit/developer`、`frontend-devkit/reviewer` | 不改檔、不寫 code、絕不 push、異常必回報、不確定就問 |
-| `frontend-devkit/developer` | subagent | `{"action":"edit","resource":"*","effect":"allow"}` **緊接其後 deny（四條）**：`*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、**`*.git/*`**（第 4 輪嚴重項：原本只封設定檔，漏了 `.git/hooks/post-commit`——寫一支 hook，之後**你每次 commit 都以你的權限執行任意程式碼**，與「改設定檔自我提權」同級。`*` 跨 `/`，一條 `*.git/*` 即涵蓋根形、`.git` 絕對形與 worktree 內的 `.git` 檔案形） | `ask` 起頭 → allow：profile 各 gate（**不含「依賴安裝」那一列**，developer 一律不裝依賴）、`## 額外 shell` 條目、唯讀 git（`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git ls-files *`）→ **結尾走三段式，但第 3 段為空**（§7.3.3：developer 連 `npm ci` 也 deny） | `question` deny（要提問經協調者）；`skill` deny；`webfetch` deny | deny | 只在指定工作目錄改檔；不 commit；**絕不碰任何設定檔、`.opencode/` 與 `.git/`**；改到 `package.json` 要醒目標報 |
-| `frontend-devkit/reviewer` | all | `{"action":"edit","resource":"*","effect":"deny"}` | `deny *` 起頭（地板）→ allow 唯讀 git：`git diff *`、`git status *`、`git log *`、`git show *`、`git fetch`（精確形）、`git rev-parse *`、`git merge-base *`、`git ls-tree *`（**用途：比對「既有測試是否被刪改」需讀基準版檔案清單**）、`git cat-file *`（**同用途：取基準版內容**）、`git check-ignore *`、`git worktree list`（精確形）、`git branch --show-current`（精確形）、`git worktree add --detach .worktrees/review-*`、`git worktree remove --force .worktrees/review-*` → allow worktree 就緒（**全部具名到 `review-` 前綴**，第 4 輪：不該讓唯讀 reviewer 能動到開發 worktree）：`New-Item -ItemType Junction -Path .worktrees/review-*`、`Resolve-Path node_modules`（精確形）、`Copy-Item * .worktrees/review-*`、`Test-Path .worktrees/review-*`、`cmd /c rmdir .worktrees/review-*`（實測：反斜線的實際指令會被正規化後匹配同一條 allow，**不必並列兩形**，見下方反斜線結論）、`npm ci *`／`pnpm install --frozen-lockfile *`（或 profile 的**不可變**依賴安裝指令）→ allow gate：profile 的 test／lint／build 具名指令（專案端追加）→ **結尾三段式**：第 1 段 `git push *`、`git commit *`、`git checkout *`、`git switch *`、`git reset *`、`git rebase *`、`git merge *`、`git clean *`、`git stash *`、`git worktree prune *`；第 2 段可變依賴家族；第 3 段不可變例外 allow（§7.1） | `webfetch` deny、`skill` deny、`question` deny | deny | 唯讀（唯一例外：審核 worktree 建立／清除與環境檔**進 worktree** 的複製）；必須獨立查證，不採信 developer 回報；**絕不嘗試白名單外指令** |
-| `frontend-devkit/setup` | all | `deny *` 起頭 → **只 allow 四個具名檔＋四種設定檔字面形**：`*.opencode/frontend-devkit/project.md`、`*.opencode/frontend-devkit/resolved.md`、`*.opencode/frontend-devkit/resolved.check.md`（比對用暫存，§3）、`opencode.json`、`opencode.jsonc`、`.opencode/opencode.json`、`.opencode/opencode.jsonc`（**全部用字面相對形，不用 `<設定檔路徑>` 這種變數**——第 4 輪阻擋項 #4：主體是一份靜態 frontmatter，「依 profile 的某一路徑」不是合法 resource）。並**明文 deny 全域設定**：`~/.config/opencode/*`（`~` 由官方在 edit/read resource 上展開）——profile 是可被改寫的不可信輸入，若 allow 能指向全域路徑，等於借 setup 的手改到**這台機器所有專案**的 agent 權限。也**不得** allow 目錄通配 `*.opencode/frontend-devkit/*`（專案安裝法下那會涵蓋 pack 原文，比對基準可被掉包）與 `*.gitignore`（只能向你建議） | `deny *` 起頭 → allow：`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git check-ignore *`（§5.1.1#4 查 worktree 是否被 ignore）、`git symbolic-ref *`／`git remote show *`（§5.1.1#2 取基準分支）、`git worktree list`、`Get-FileHash *`（§6.3 checksum）、`Write-Output *`（**shell 探針**，§5.1.1#1）；**用途標明**：`npm ls *`／`pnpm ls *`（§5.1 比對 lockfile 與已裝版本，非可有可無）、`npm view *`（選填，只在你要查套件安全性時）；讀 `package.json`／設定檔一律用 `read` 工具，不靠 `Get-Content` | `webfetch` allow（只在你要求查套件安全性時）；`skill` deny；`question` allow | **deny，唯一例外 allow `frontend-devkit/reviewer`**（D17：probe 要由「**唯一能寫 `project.md` 與設定檔的角色**」發起並落盤，而不是「能寫 resolved.md 的角色」——第 3 輪更正措辭，因為 probe 結果已改記在 `project.md` 的 `## 安裝紀錄`；被派的 reviewer 本身 `edit deny *`、`subagent deny`，風險被封在「執行一條指令並回報」的範圍內。不准派 developer／orchestrator） | 只寫上述具名檔；**不得**改專案程式碼、`package.json`、`.gitignore`、`.git/*`、全域設定、pack 原文或程序檔；寫設定檔前必須先 `read` 並保留既有欄位；跑完必呈現「寫了什麼、跳過了什麼」 |
+| `frontend-devkit/orchestrator` | primary | `{"action":"edit","resource":"*","effect":"deny"}` | `ask` 起頭 → allow：`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git branch *`、`git worktree add *`、`git worktree list`、`git add *`、`Test-Path *`、**具名到 worktree 的寫入／刪除通道**：`New-Item -ItemType Junction -Path .worktrees/*`、`Resolve-Path node_modules`（精確形）、`Copy-Item * .worktrees/*`、`cmd /c rmdir .worktrees/*` → 再掛 `git commit *`、`git merge *`、`git worktree remove *`、`git branch -D *` 為 **ask** → **結尾三段式**（§7.1 定義：第 1 段真地板 `git push *`／`git rebase *`／`git reset *`／`git checkout *`／`git switch *`／`git clean *`／`git stash *`／`git worktree prune *`；第 2 段可變依賴家族；**第 3 段不可變例外 allow `npm ci *`、`pnpm install --frozen-lockfile *`、`yarn install --frozen-lockfile *`，必須排在第 2 段之後**，否則 §9.3 的 `install-per-worktree` 會被自己翻回 deny） | `question` allow；`skill` deny；`webfetch` deny | 僅 `frontend-devkit/developer`、`frontend-devkit/reviewer` | 不改檔、不寫 code、絕不 push、異常必回報、不確定就問 |
+| `frontend-devkit/developer` | subagent | `{"action":"edit","resource":"*","effect":"allow"}` **緊接其後 deny（四條）**：`*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、**`*.git/*`**（第 4 輪嚴重項：原本只封設定檔，漏了 `.git/hooks/post-commit`——寫一支 hook，之後**你每次 commit 都以你的權限執行任意程式碼**，與「改設定檔自我提權」同級。`*` 跨 `/`，一條 `*.git/*` 即涵蓋根形、`.git` 絕對形與 worktree 內的 `.git` 檔案形） | `ask` 起頭 → allow：**§7.3.0.1 的主體靜態清單**（profile 的 gate 若不在清單內＝逐次彈窗問你；**不含「依賴安裝」那類**，developer 一律不裝依賴）；`## 額外 shell` 在方案 B 下只作「詢問預期清單」（靠 `Allow always` 持久化，§7.3.1 事實 7，**不是寫規則**）、唯讀 git（`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git ls-files *`）→ **結尾走三段式，但第 3 段為空**（§7.3.3：developer 連 `npm ci` 也 deny） | `question` deny（要提問經協調者）；`skill` deny；`webfetch` deny | deny | 只在指定工作目錄改檔；不 commit；**絕不碰任何設定檔、`.opencode/` 與 `.git/`**；改到 `package.json` 要醒目標報 |
+| `frontend-devkit/reviewer` | all | `{"action":"edit","resource":"*","effect":"deny"}` | `deny *` 起頭（地板）→ allow 唯讀 git：`git diff *`、`git status *`、`git log *`、`git show *`、`git fetch`（精確形）、`git rev-parse *`、`git merge-base *`、`git ls-tree *`（**用途：比對「既有測試是否被刪改」需讀基準版檔案清單**）、`git cat-file *`（**同用途：取基準版內容**）、`git check-ignore *`、`git worktree list`（精確形）、`git branch --show-current`（精確形）、`git worktree add --detach .worktrees/review-*`、`git worktree remove --force .worktrees/review-*` → allow worktree 就緒（**全部具名到 `review-` 前綴**，第 4 輪：不該讓唯讀 reviewer 能動到開發 worktree）：`New-Item -ItemType Junction -Path .worktrees/review-*`、`Resolve-Path node_modules`（精確形）、`Copy-Item * .worktrees/review-*`、`Test-Path .worktrees/review-*`、`cmd /c rmdir .worktrees/review-*`（實測：反斜線的實際指令會被正規化後匹配同一條 allow，**不必並列兩形**，見下方反斜線結論）、`npm ci *`／`pnpm install --frozen-lockfile *`（**主體靜態清單內**的不可變安裝；profile 若改用別的不可變形，而它不在清單內 → reviewer 標「需人工執行」）→ allow gate：**§7.3.0.1 的主體靜態清單**（`npm test *`、`npx vitest run *`… 逐條）。**方案 B 下專案端不寫 shell 規則**：profile `## 指令` 的角色是「告诉 agent 該跑哪條」與「compile 比對清單可行性」，不是授权來源；清單未涵蓋者一律走「需人工執行」降級（§7.3.0.1#2）→ **結尾三段式**：第 1 段 `git push *`、`git commit *`、`git checkout *`、`git switch *`、`git reset *`、`git rebase *`、`git merge *`、`git clean *`、`git stash *`、`git worktree prune *`；第 2 段可變依賴家族；第 3 段不可變例外 allow（§7.1） | `webfetch` deny、`skill` deny、`question` deny | deny | 唯讀（唯一例外：審核 worktree 建立／清除與環境檔**進 worktree** 的複製）；必須獨立查證，不採信 developer 回報；**絕不嘗試白名單外指令** |
+| `frontend-devkit/setup` | all | `deny *` 起頭 → **只 allow 四個具名檔＋四種設定檔字面形**：`*.opencode/frontend-devkit/project.md`、`*.opencode/frontend-devkit/resolved.md`、`*.opencode/frontend-devkit/resolved.check.md`（比對用暫存，§3）、`opencode.json`、`opencode.jsonc`、`.opencode/opencode.json`、`.opencode/opencode.jsonc`（**全部用字面相對形，不用 `<設定檔路徑>` 這種變數**——第 4 輪阻擋項 #4：主體是一份靜態 frontmatter，「依 profile 的某一路徑」不是合法 resource）。並**明文 deny 全域設定**：`~/.config/opencode/*`（`~` 由官方在 edit/read resource 上展開）——profile 是可被改寫的不可信輸入，若 allow 能指向全域路徑，等於借 setup 的手改到**這台機器所有專案**的 agent 權限。也**不得** allow 目錄通配 `*.opencode/frontend-devkit/*`（專案安裝法下那會涵蓋 pack 原文，比對基準可被掉包）與 `*.gitignore`（只能向你建議） | `deny *` 起頭 → allow：`git status *`、`git diff *`、`git log *`、`git rev-parse *`、`git check-ignore *`（§5.1.1#4 查 worktree 是否被 ignore）、`git symbolic-ref *`／`git remote show *`（§5.1.1#2 取基準分支）、`git worktree list`、`Get-FileHash *`（§6.3 checksum）、**探針兩條（第 5 輪阻擋項 #2 修正：`Write-Output` 那一形實測會被拒，探針必須用無 `$`、無括號的 cmdlet 精確形）**：`Get-Location`（§5.1.1#1 判 shell）、`cmd /c ver`（交叉驗證 Windows）；`Write-Output *` 可留但**不得再掛「shell 探針」標籤**；**用途標明**：`npm ls *`／`pnpm ls *`（§5.1 比對 lockfile 與已裝版本，非可有可無）、`npm view *`（選填，只在你要查套件安全性時）；讀 `package.json`／設定檔一律用 `read` 工具，不靠 `Get-Content` | `webfetch` allow（只在你要求查套件安全性時）；`skill` deny；`question` allow | **deny，唯一例外 allow `frontend-devkit/reviewer`**（D17：probe 要由「**唯一能寫 `project.md` 與設定檔的角色**」發起並落盤，而不是「能寫 resolved.md 的角色」——第 3 輪更正措辭，因為 probe 結果已改記在 `project.md` 的 `## 安裝紀錄`；被派的 reviewer 本身 `edit deny *`、`subagent deny`，風險被封在「執行一條指令並回報」的範圍內。不准派 developer／orchestrator） | 只寫上述具名檔；**不得**改專案程式碼、`package.json`、`.gitignore`、`.git/*`、全域設定、pack 原文或程序檔；寫設定檔前必須先 `read` 並保留既有欄位；跑完必呈現「寫了什麼、跳過了什麼」 |
 
 > **尾巴三段式（權威定義；各 agent 的清單以本塊為正典）**
 > 每個 agent 的 shell 陣列**結尾**固定切成三段，順序不可變：
@@ -413,12 +413,12 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 #### 7.3.0 術語定義：方案 A / 方案 B（G12 補，之前全檔引用卻從未定義）
 
-| | ~~**方案 A（原預設）**~~：**實測不通過**（`docs/experiments.md` 第 3 題） | **方案 B：現在的預設** |
+| | ~~**方案 A（原預設）**~~：**在本次測到的形態下不通過**（`docs/experiments.md` 第 3 題；專案端形態待覆驗，見 §7.3.0 復活條件的先決步驟） | **方案 B：現在的預設** |
 |---|---|---|
 | shell 規則放哪 | 主體 frontmatter 放「地板＋通用唯讀指令」；專案端 `agents.<id>.permissions` 追加該專案特有的窄域 allow | **全部 shell 規則靜態寫進主體 frontmatter**，專案端完全不寫 shell 規則 |
 | 白名單精準度 | （高，但**做不到的話是零**：實測顯示專案端 allow 不會生效） | 中（主體要容納各家管理器的 gate 變體，逐條列在 §7.3.0.1） |
-| 是否依賴未記載的跨來源次序 | 實測結論：agent `.md` 的規則**排在設定檔之後**，地板 deny 蓋掉專案端 allow → 方案 A 的 allow 機制在本機 v2.2.7 **根本不通**（不是「偏嚴」，是「全數失效」） | 完全不涉及 |
-| 何時改用 | **復活條件（唯一）**：在真實前端專案＋TUI 安裝形態重驗第 3 題，若專案端 allow 生效（`experiments.md` 二.2 的工具鏈限制解除），才可把方案 A 放回選項；否則永久停用 | 預設 |
+| 是否依賴未記載的跨來源次序 | 實測結論：agent `.md` 的規則**排在設定檔之後**，地板 deny 蓋掉專案端 allow → 方案 A 的 allow 機制在**本次測到的形態**（全域 `.md` agent × 全域 `opencode.json`）無效：地板 deny 蓋掉 jsonc allow。**專案端 config × 專案／全域 agent 的形態未驗**，且 `experiments.md` 二.2 的「找不到專案本地 agent」高度可能是我的服務綁定操作問題 | 完全不涉及 |
+| 何時改用 | **復活條件**（先決步驟：先排除服務綁定因素）**：① 於目標專案啟 session，第一條先跑 `Get-Location` 確認服務真的綁在該專案；② 確認該專案 `.opencode/agents/` 的 agent 出現在可選清單；③ 才測「專案端 `opencode.json` 追加 allow」是否生效。**三步驟任一失敗先修操作、不下平台結論**；只有在綁定正確而 allow 仍失效時，方案 A 才判定停用 | 預設 |
 | 代價 | 每次 init 要逐條批准 allow | 主體白名單變寬、升級時要跟著各專案指令改；profile 的 `## 指令` 與真實權限可能不一致（需 `inspect` 檢查） |
 
 #### 7.3.0.1 方案 B 的具體規格（第 4 輪阻擋項 #2：原本只有取捨表，無法獨立實施）
@@ -451,6 +451,8 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 | 複合指令也要能擋 | `git status && npm ci` 只比整串 → 漏網 | 依賴 scanner 拆句（事實 6）；主體另外禁止用 `&&`／`;` 串接白名單外指令（提示詞紀律，現行 reviewer 已有） |
 | 不靠 `node -e` 之類的動態求值做事 | `setup` 用 `node -e "…"` 算 checksum | 用 `Get-FileHash *` allow；`node -e` 一律列入「需實測、不採用」 |
 | 要**最嚴**時可用無尾綴的精確形 | `git fetch *` 放行任何 refspec | `git fetch`（精確形、禁一切參數）是**比 ` *` 更嚴的合法選項**，用於 `git worktree list`、`git branch --show-current`、`git fetch` 這類「不該有參數也合理」的指令（第 3 輪 S4） |
+| **字面同形鐵律**（第 5 輪補：先前只在 §9.3 出現，本表卻被引用為出處） | 程序檔寫 `Resolve-Path node_modules`、allow 寫 `Resolve-Path -Path node_modules` → 實測**互不匹配**（第 5 題：scanner 用原始字串逐字比對、不重組參數） | allow 的 resource 必須與「agent 實際要打出的字串」**逐字相同**；`X`、`X Y`、`X -Path Y` 視為三條不同規則。程序檔與 frontmatter 白名單要成對審（§9.3、§13 關卡 4） |
+| **`$` 變數成員存取與括號子運算式屬高危形，程序檔不要這樣寫**（第 5 輪補引用） | 實測 `Write-Output $PSVersionTable.PSVersion.ToString()` 與 `Write-Output (Resolve-Path .).Path` 都 DENIED，即使 `Write-Output *` 已在白名單 | 程序檔一律用「無 `$`、無括號」的形式，需要中間值就走兩步（先取值、再把**已驗證的字面值**代入下一條，§9.3）。第 8 題只記錄到 DENIED、**未存錯誤訊息**，「無法安全分析／次指令」屬推定，關卡 4 要存 raw 輸出覆核 |
 
 #### 7.3.3 主體自給自足的規則鏈（D13）
 
@@ -495,15 +497,15 @@ developer 的尾巴群（逐條展開、**不含 pipe**；依 §7.1 三段式排
 
 > **承認遮不住全部**（新增 R9）：前綴式白名單／黑名單無法窮盡繞道（例：`npx --package pnpm pn add x`、自訂 npm alias、`node scripts/install.js`）。所以 kit 的最終關卡不是 shell 規則，而是**既有兩道紀律**：developer 必須醒目標報「是否改動 `package.json`」、reviewer 必須用 `git diff` 檢查 `package.json`／lockfile 是否被動。主體提示詞要把這句寫明：「shell 規則只是護欄，不是保險」。
 
-#### 7.3.4 跨來源紀律（避免次序依賴）
+#### 7.3.4 跨來源紀律（**方案 A 的保留條款**）\n\n> **現況標記（第 5 輪）**：xperiments.md 第 3 題實測後，**方案 B 是現行預設**，本節第 1–6 點只有在「方案 A 依 §7.3.0 先決步驟覆驗成功」後才會啟用；**第 7 點（設定檔與 .git/ 只准 setup 寫）是兩案通用的現行紀律**。另加一條 B 紀律：**專案端設定只准出現 instructions 與 model**，inspect 若偵測到 gents.<id>.permissions 含 shell 條目即警告（依實測它不會生效，留著只會誤導人以為已授權）。
 
 1. **同一 `action` 的「地板」只能由主體 frontmatter 定義**。專案端 `opencode.json` 的 `agents.<id>.permissions` **僅准許**追加：更窄的 `allow`（該專案特有的 gate 指令，如 `pnpm --filter web test *`）或更嚴的 `deny`。不得在專案端追加 `{"resource":"*"}` 等級的規則。
 2. **關鍵前提（G3＋第 3 輪修正：比對對象要明确排除地板，否則方案 A 被自己封殺）**：專案端追加的每一條 `allow`，**不得命中主體「尾巴三段式第 1、2 段」的任何 deny pattern**。注意**不含** `resource: "*"` 的那條地板 deny——若把地板也算進比對，任何窄域 allow 都命中 `*`，`setup` 會拒絕寫入**所有**專案端 allow，與本節第 1、4 點和 §7.3.0 方案 A 直接矛盾。只有滿足這個前提，「兩種次序都不偏鬆」才成立：若次序是「jsonc 先、.md 後」且該 allow 命中第 1／2 段 deny，最後符合者勝就會**翻掉地板**。另需記得 D14 所稱「任何 allow 蓋不掉」的地板**僅指第 1 段**，第 2 段可被第 3 段例外翻回（§7.1）；而官方只保證「持久批准（`allow always` 存下的規則）蓋不掉設定的 deny」，並未保證 jsonc 規則蓋不掉 `.md` 的 deny。
 3. 此前提**必須機械檢查，不能只靠提示詞**：`setup` 寫入任何 allow 前，逐條與「主體四個 agent 的 deny resource」做 wildcard 比對，命中即**拒絕寫入**並告知你該指令屬主體禁止範圍；`inspect` 重跑同一比對，把「專案端 allow ∩ 主體 deny 必須為空」列為檢查項（§8）。
 4. 有了第 2、3 點，失配模式才真的只剩「偏嚴」一種：次序為「jsonc 先、 .md 後」時，專案端窄 allow 被主體地板 deny 蓋掉 → reviewer 少一條指令而卡住（可用性問題，非安全問題）；次序為「 .md 先、jsonc 後」時窄 allow 生效。**兩種次序的安全邊界一致**，這才叫次序無關。
-5. 「偏嚴卡死」仍是真實風險，所以 `inspect [probe]` 是必經步驟（§8.2）。probe 第 1 條**必須用「只來自專案端 jsonc 的 gate 指令」**——不能用 `git rev-parse *` 這種主體本來就 allow 的指令，那樣任何次序都會 allow，完全沒有判別力（G5）。第 1 條被拒 → 次序與假設相反，改走**方案 B**（定義見 §7.3.0）；第 2 條（必被拒的寫入指令）若被准 → **立即停用 kit**，屬提權漏洞，停止並等你處理。
+5. **方案 B 已是現行預設**，所以本節第 1–6 點只在「方案 A 覆驗成功後」才適用（§7.3.0 先決步驟）。`inspect [probe]` 在 B 下的職責改為**版本迴歸偵測**（§8.2）：第 0 條 `Get-Location` 確認落點、第 1 條測主體靜態清單內的 gate、第 2 條測必被拒的寫入指令。第 1 條被拒 → 清單與實作不同步或落點錯了；第 2 條被准 → **立即停用 kit**（提權漏洞，不是可用性問題），並引用該規則出自哪個檔案、哪個陣列位置。
 6. 「例外 allow」（先 deny 家族、再 allow 例外，如 §7.1 的 `--frozen-lockfile` 寫法）**只准許出現在主體自己的陣列**；專案端拿它就違反第 2 點，`setup` 必須拒絕。
-7. **設定檔的寫入權只屬於 `setup`**：orchestrator（`edit deny *`）、developer（deny `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`）、reviewer（`edit deny *`）。developer 的 deny 必須排在它自己的 `allow *` 之後（§7.3.1 事實 4、§7.3.2），且由 §13 關卡 1 實測四種路徑形（根相對、根絕對、`.opencode` 相對、worktree 內副本）**都**被拒。
+7. **設定檔與 `.git/` 的寫入權只屬於 `setup`**：orchestrator（`edit deny *`）、developer（deny `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、**`*.git/*`**）、reviewer（`edit deny *`）。developer 的 deny 必須排在它自己的 `allow *` 之後（§7.3.1 事實 4、§7.3.2），並**已由 `experiments.md` 第 6 題實測**：根相對、根絕對、`.opencode` 相對、worktree 內副本、`opencode.jsonc`、`.git\hooks\` **六種形全數被拒**；§13 關卡 1 由「首次驗證」降為「回歸抽驗」。
 
 #### 7.3.5 專案端 allow 的產生流程（安全關鍵，第 2 條嚴重問題在此修掉）
 
@@ -551,9 +553,9 @@ developer 的尾巴群（逐條展開、**不含 pipe**；依 §7.1 三段式排
 
 **執行者（G4 定案）**：`setup`。它在 §7.1 的 `subagent` 是「deny，唯一例外 allow `frontend-devkit/reviewer`」——因為能被寫進設定檔的只有 setup，而 reviewer 本身唯讀、不能再派工，風險限於「執行一條指令並回報結果」。流程作為 init／compile 的最後一步，以及每次 kit 升級後的檢查：
 
-1. **判別力第一條鐵律（G5）**：probe 的第 1 條**必須是「只存在於專案端 jsonc 的 gate 指令」**（init 剛寫進去的那條，例 `pnpm --filter web test *`）。用 `git rev-parse *` 之類「主體本来就 allow」的指令做第 1 條是無效測試——任何次序都會放行，驗不出次序。
-2. 第 1 條（專案端 gate）→ 預期 allow；第 2 條（必被拒的寫入指令，例 `git commit --allow-empty -m probe`）→ 預期 deny。
-3. 結果判讀：第 1 條被拒 → 次序與假設相反，改走**方案 B**（定義與取捨見 §7.3.0）；第 2 條被放行 → **立即停用 kit**，這是提權漏洞（不是可用性問題），停止並等你處理，且 `setup` 要在回報裡引用那條規則的出處（哪個檔案、哪一個陣列位置）。
+1. **方案 B 下的定位（第 5 輪重定義）**：專案端已不寫 shell 規則，「判別跨來源次序」在 B 下**無物件可測**，因此 probe 改為**版本迴歸偵測**。**第 0 條必先是 `Get-Location`**（`experiments.md` 二.1：shell 落在 service 綁定的專案目錄，可能不是你以為的那個），用來確認落點就是本專案；第 1 條測「主體靜態清單內的 gate」（例 `npm test *`）→ 預期 allow。原本的「第 1 條必須只來自專案端 jsonc」判別力設計，**整段移入 §7.3.0 的方案 A 復活檢測**。
+2. 第 1 條（靜態清單 gate）→ 預期 allow；第 2 條（必被拒的寫入指令，例 `git commit --allow-empty -m probe`）→ 預期 deny。第 1 條若被拒＝清單與主體不同步或落點錯了（回到第 0 條查）。
+3. 結果判讀：**第 0 條的落點必須就是本專案**（`experiments.md` 二.1 的教訓），否則整輪 probe 無效、先修操作環境再重測。第 1 條被拒 → 主體靜態清單與 profile 期望不同步（依 §7.3.0.1#2 走「需人工執行」，並檢查是不是清單該升級）；第 2 條被放行 → **立即停用 kit**，屬提權漏洞，停止並等你處理，`setup` 要在回報裡引用那條規則的出處（哪個檔案、哪個陣列位置）。
 4. probe 結果由 setup 寫進 **`project.md` 的 `## 安裝紀錄`**（含日期與 OpenCode 版本），**不寫進 `resolved.md`**——後者是 compile 每次重譯的產物，記錄放那裡會被抹掉（G4 的檔頭／檔尾矛盾就此消除；`resolved.md` 檔頭只留「上次 probe 於 <日期> 通過，詳見 project.md `## 安裝紀錄`」這一行引用）。
 
 ---
@@ -628,7 +630,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 
 | 狀況 | 行為 |
 |---|---|
-| `project.md` 不存在 | orchestrator 不開始流程，提示 `/frontend-devkit/init`；用 `question` 給第二條路：**「僅本次以口述 gate 繼續」**——由 orchestrator 一次問完最小集合（test／lint／build 各自的指令或「無」），**本次不套用任何 pack、也無需 profile**，回報須標「依據僅為口述，未做設定檔層級的檢查」。不得自己讀 `package.json` 猜（那是 `setup` 的職責，而 orchestrator 的 subagent 白名單只有 developer／reviewer，見 §7.1）。**豁免（G8）：選走這條時，§6.3 與下節「`resolved.md` 缺失即停止」的鐵則一併豁免**，但該輪所有回報與（若有的）產物都要標「無設定檔模式」，且不得聲稱做過 pack 層級檢查。**降級明細（第 4 輪一般 #7：否則物理上跑不動）**：無 profile＝無專案端 allow，而 reviewer 的 shell 是 `deny *` 起頭 → **該模式 reviewer 不執行任何 gate**（developer 是 `ask` 起頭，仍可彈窗問你後執行）。此輪的 VERDICT 只能基於「lint 未跑／測試未獨立重跑」的弱依據，回報必須在「回歸檢驗」寫「無設定檔模式：gate 由 developer 單方執行，reviewer 未獨立重跑」，且 `inspect`／README 都要提醒「此模式不建議用於要 commit 的任務」 |
+| `project.md` 不存在 | orchestrator 不開始流程，提示 `/frontend-devkit/init`；用 `question` 給第二條路：**「僅本次以口述 gate 繼續」**——由 orchestrator 一次問完最小集合（test／lint／build 各自的指令或「無」），**本次不套用任何 pack、也無需 profile**，回報須標「依據僅為口述，未做設定檔層級的檢查」。不得自己讀 `package.json` 猜（那是 `setup` 的職責，而 orchestrator 的 subagent 白名單只有 developer／reviewer，見 §7.1）。**豁免（G8）：選走這條時，§6.3 與下節「`resolved.md` 缺失即停止」的鐵則一併豁免**，但該輪所有回報與（若有的）產物都要標「無設定檔模式」，且不得聲稱做過 pack 層級檢查。**降級明細（第 5 輪改正：方案 B 下不是「全部跑不了」，而是三角色不同）**：① **reviewer**（`deny *` 起頭）——口述 gate 若正好是靜態清單內的指令（`npm test *`、`npx eslint *`…）**可執行**；清單外一律「需人工執行」，並在回報註明；② **developer**（`ask` 起頭）——清單外會**彈窗問你**，你准了才跑；③ **orchestrator**——它的白名單本就靜態內建，不受有無 profile 影響（只有 worktree／環境檔等參數需要 profile）。此輪的 VERDICT 只能基於「lint 未跑／測試未獨立重跑」的弱依據，回報必須在「回歸檢驗」寫「無設定檔模式：gate 由 developer 單方執行，reviewer 未獨立重跑」，且 `inspect`／README 都要提醒「此模式不建議用於要 commit 的任務」 |
 | `resolved.md` 缺失／**檔頭啟用清單與 `project.md` 不一致** | 停止並提示 `/frontend-devkit/init compile`，不靜默用舊產物（執行期只比清單，checksum 驗算歸 `inspect`／`compile`，§6.3）。**例外**：上一列經使用者明確選「僅本次以口述 gate」時豁免 |
 | `resolved.md` 與 `kitRoot` 源頭素材**不一致**（被手改、或 pack 改過沒重譯） | `inspect` 以源頭素材在上下文**重建內文**，與 `resolved.md` 內文**逐行**比對（**排除檔頭動態欄**，否則時間戳讓警告常亮；誠實標明這是 LLM 逐行比對而非機械 diff）。不是只比 checksum——保留原 checksum 字串就能混過（G9）；不一致即警告並停止審核，提示 `init compile`。需要落盤差異報告時只准寫 `.opencode/frontend-devkit/resolved.check.md`（§3） |
 | **profile 欄位值不在白名單**（`設定檔路徑`／`kitRoot`／`worktree 目錄`／`環境檔`，§5.1.2） | `setup` 寫入前即拒絕並停止；已存在的非法值由 `inspect` 每輪檢出 → **停止流程並提示重跑 init**，不得「先信再跑」。這四種值會讓 setup 或 orchestrator 變成借刀寫全域設定、把 worktree／`.env` 放到專案外、或掉包 D21 的比對基準 |
@@ -647,9 +649,9 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | 主工作區髒 | 告知 + `question` 詢問是否續（§10.1 步驟 3） |
 | 專案端 model 覆寫的 provider 不存在 | 報錯並建議移除覆寫改繼承 session model，不靜默降級 |
 | **使用者沒跑 init 就做事**（第 3 輪指出我原威脅模型寫錯） | **不存在「無規則＝全開」的洞**：shell 規則在四個 agent 的 `.md` frontmatter 內、隨 agent 定義載入，叫得到 `frontend-devkit/reviewer` 就代表地板與放行群**已生效**；灌掉專案端 jsonc 的 `agents` 節點只是少了專案追加的窄 allow（偏嚴方向），不會讓未列指令變可用。真正的風險是另一件事：**使用者沒選 kit agent、逕用內建 `build` 跑任務**（`build` 沒有這套地板）——這擋不住，只能在 README 告警，並讓 `inspect` 檢查「本專案有無 profile／是否被其他 agent 動過」。誠實標明，不假稱有防堵 |
-| **`## 啟用規則` 內沒有任何 `security/*`**（第 3 輪嚴重項） | `compile`／`init` 醒目警告；四個流程指令啟動前必須 `question` **二次確認**（選項文字要寫出後果：「僅執行主體基本安全項，不含專案專屬 sanitizer／白名單檢查」），未確認不進入流程；確認後 reviewer 仍執行 §3 第 0 點，並在回報標「未啟用安全 pack」。**規避不得**：把 pack 停用等同放棄安全檢查 |
+| **`## 啟用規則` 內沒有任何 `security/*`**（第 3 輪嚴重項） | `compile`／`init` 醒目警告；**orchestrator 的三條指令**（dev／fix／review-fix）啟動前必須 `question` **二次確認**（選項文字要寫出後果：「僅執行主體基本安全項，不含專案專屬 sanitizer／白名單檢查」），未確認不進入流程；**`/review` 例外**：reviewer 是 `question: deny`，問不了 → 改為**不開始審核**並輸出固定提示句（§3 第 3 點），不得假設你已同意。確認後 reviewer 仍執行 §3 第 0 點，並在回報標「未啟用安全 pack」。**規避不得**：把 pack 停用等同放棄安全檢查 |
 | 口述 gate 模式（§11 第 1 列）下的 worktree 決策 | 一律按 `worktreePolicy: ask` 處理（沒有 profile 就假定要問），且 `depStrategy` 只能取 `junction` 或 `none` 二者由你選；不可默認 `install-per-worktree`（那需要 profile 裡的安裝指令） |
-| **有人把 profile 未批准的可寫入指令（如含 `--fix` 的 lint）寫進 allow** | reviewer 依主體鐵則**拒絕執行該指令**並改用「只跑異動檔」的具名指令；若沒有替代寫法，把該 gate 記為「因白名單疑似違規未執行」，並在 ISSUES 列「嚴重」要求修正設定檔 |
+| **有人在 profile 裡放進「未批准的可寫入指令」**（如 `## 指令` 或 `## 額外 shell` 填入含 `--fix`、`rm`、`Invoke-Expression` 的條目） | **方案 B 下這類條目不會變成授權**（專案端不寫 shell 規則）：① `setup`／`compile` 依 §7.3.5 的寫入性檢查標為 `疑似可寫入`，不列入可執行 gate；② 若 reviewer 在清單內找不到它 → 走「需人工執行」（§7.3.0.1#2）；③ 若 developer 被要求跑它 → `ask` 彈窗**預覽展開後的原始命令字串**由你拒否；④ 已存進去的持久 allow（`Allow always`）若屬寫入性，`inspect` 要列出要你手動撤除。reviewer 一律不得因「設定檔這麼寫」就執行寫入性指令 |
 | 全域與專案同時裝了同名 agent | `inspect` 警告（permission 規則會附加）；開發流程開始前 orchestrator 也要能用 `inspect` 的結論提示你 |
 | 本專案（TOS_Frontend）誤用 kit | 行為可預期：沒有 `project.md` → 停止並提示 init；舊 `/dev` 流程與新指令互不干擾 |
 
@@ -676,7 +678,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | workflow-rules.md 的「實作前必問 worktree」 | 主體 + profile `worktreePolicy`（D8） |
 | workflow-rules.md §3 四條通過標準 | 主體規則 + profile `## 指令`（gate 清單） |
 | worktree-procedures.md 全文 | `kit/worktree.procedures.md`（§9，內容參數化；執行期由 compile 折進 `resolved.md`） |
-| developer.md 第 137 行「不要修改 `.opencode/` 內的設定檔」 | 主體規則（§7.1 developer 列、§7.3.4 第 7 點）：`allow *` 之後 deny `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`——**v1 遷移時被我弄丟的提權封堵**（§17 I-1；第 2 輪 G2 指出舊寫法 `*.opencode.json`／根 `opencode.json` 會漏掉 `opencode.jsonc` 與 worktree 內副本，故以本行為準） |
+| developer.md 第 137 行「不要修改 `.opencode/` 內的設定檔」 | 主體規則（§7.1 developer 列、§7.3.4 第 7 點）：`allow *` 之後 deny `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、**`*.git/*`**（第 5 輪補 `.git`，四條；六種路徑形已由 `experiments.md` 第 6 題實測全拒）——**v1 遷移時被我弄丟的提權封堵**（§17 I-1；第 2 輪 G2 指出舊寫法 `*.opencode.json`／根 `opencode.json` 會漏掉 `opencode.jsonc` 與 worktree 內副本，故以本行為準） |
 | reviewer.md 第 43–50 行「bash 指令寫法限制」整段（禁 `--fix`、禁 `--output`、`git fetch` 不可帶 refspec、`Test-Path` 前綴紀律、不用 `Get-ChildItem`／`Get-Content`／`Remove-Item`／`cd`） | 升為**主體鐵則**（§7.2 末段），並在 §7.3.5 變成「allow 產生時就要驗唯讀」的機械步驟 |
 | orchestrator.md 第 87 行（同名 worktree／分支已存在 → 不硬蓋，`question` 請使用者決定） | §9.2，主體保留 |
 | orchestrator.md 第 170 行（清除前在 worktree 跑 `git status --short` 檢查未 commit 殘留並告知，因 `--force` 會丟棄） | §9.7，主體保留（**丢資料防護**，v1 遷移時我原本只剩「合併前確認狀態」） |
@@ -692,7 +694,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 |---|---|---|---|
 | **0 建置（人工，不屬於 kit 的權限模型）** | `%LOCALAPPDATA%\Temp\opencode\frontend-devkit-eval\`（本機範例：`C:\Users\vipjo\AppData\Local\Temp\opencode\`；**這是給本機執行者看的路徑，不寫進 kit 任何檔案**） | 由**你或我在殼層手動**建兩個試寫專案：`app-a`＝`npm create vite@latest app-a -- --template vue` 後各自 `npm install`（要網路）；`app-b`＝複製 `app-a` 再手動砍 `.opencode/frontend-devkit/project.md`。兩者各自 `git init` 並留一個 commit 當審核標的 | 兩個專案都能 `npm run build` 過；`app-a` 乾淨可提交；**kit 的 agent 不做這些動作**（setup 無建專案的權限，也不該有） |
 | 1 載入關 | 裝全域後，任一探視用資料夾（**尚未 init**） | agent 與指令清單是否正確、ID 是否帶命名空間、**rules／程序檔有沒有被誤當 agent 發現**（見 §4.2 發現規則陷阱）、**主體地板是否生效**（本階段還沒有專案端規則，只能驗「必被拒」的方向）、**developer 拒絕編輯的完整清單**：四種設定檔路徑形（根相對 `opencode.json`、根絕對形、`.opencode/opencode.json`、worktree 內 `.worktrees/<n>/opencode.json`）＋ `opencode.jsonc` 變體 ＋ **`.git/hooks/pre-commit`（第 4 輪嚴重項 #1）** ＋ `.opencode/frontend-devkit/project.md`（不屬 developer 的職責範圍） | 四個 `frontend-devkit/*` agent、六個 `/frontend-devkit/*` 指令可被選取；agent 清單沒有多出 `frontend-devkit/rules/...` 之類條目；寫入性指令被 deny；**上述每一種編輯嘗試都必須被拒**（G2／G13／第 4 輪 #1）；`inspect` 跑得出結果（此階段欄位大量 TBD 屬預期，不算失敗） |
-| 2 產生關 | 專案 A（已完成 init） | `init auto` 與 `init`（含問答）產物差異、TBD 是否如實、設定檔合併是否保留既有欄位、**跨來源次序判別**（只有這裡才有「只來自專案端的 gate allow」可當 probe 第 1 條，G5） | 兩份 profile 欄位來源標註正確；未掃到的寫 TBD 不腦補；設定檔原欄位一字不動；**probe 第 1 條（專案端 gate）allow、第 2 條 deny**；第 1 條被拒 → 記錄、改走方案 B（§7.3.0）後重跑本關 |
+| 2 產生關 | 專案 A（已完成 init） | `init auto` 與 `init`（含問答）產物差異、TBD 是否如實、設定檔合併是否保留既有欄位、**probe 的版本迴歸判別（B 版：第 0 條 `Get-Location` 落點＋第 1 條靜態清單 gate＋第 2 條地板）** | 兩份 profile 欄位來源標註正確；未掃到的寫 TBD 不腦補；設定檔原欄位一字不動；**probe 第 1 條（專案端 gate）allow、第 2 條 deny**；第 0 條落點錯 → 先修操作環境再重測（不得用別棵樹的結果充數）；第 1 條被拒 → 記錄、依 §7.3.0.1#2 標「需人工執行」並檢查主體清單是否该升級（§7.3.0）後重跑本關 |
 | 3 compile 關 | 專案 A | 亂改 pack id、停用 pack、啟用不存在 pack、改 pack 內容不重譯 | 每種都得到明確報錯或過期警告，無靜默成功 |
 | 4 流程關 | 專案 A | `/frontend-devkit/dev` 加一個小功能（按鈕 + 一個測試）：動態基準、worktree 建立／清除、七區段回報、commit 前先給你審訊息 | 全流程不問多餘問題、結束 worktree 乾淨、基準數字來自當場量測 |
 | 5 審核關 | 專案 A 故意留一個爛 commit | `/frontend-devkit/review <sha>`：輸出七個區段齊全（`目標`、`VERDICT`、`ISSUES`、`既有問題`、`疑問`、`回歸檢驗`、`建議手動回歸檢查`）、審核 worktree 必清 | 有「嚴重或一般」就 FAIL；範圍空不 PASS；`git worktree list` 只剩主工作區 |
@@ -704,7 +706,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 
 ## 14. 交付順序（給後續實作計畫的骨架）
 
-1. **實驗先行（R1 七題，在寫任何 agent 檔之前）**：拿一個最小假裝的 kit（一個 subagent + 一份假 profile + 兩條規則）實測：` *` 尾綴匹配、尾巴三段式第 3 段能否翻回第 2 段、`.md` 與 jsonc 的附加次序、**含括號子運算式是否被 scanner 接受**、**scanner 比對用的是原始字串還是重組字串**、`*.opencode/*` 是否匹配點開頭的相對路徑、**shell 資源是否做反斜線正規化**。結論寫進 `docs/install.md`，據此確認 §7.3 走方案 A 或 B、§9.3 是否改兩步寫法、§7.1 各條 resource 字面形是否要改。同一站也要驗：`tools/normalize-forms.ps1` 連跑兩次內容不變（冪等），並確認在 PS7 下不寫出 BOM。**本站已於 2026-11-11 完成**，結果見 `docs/experiments.md` 與 §17.11：` *` 尾綴成立、三段式第 3 段可翻回第 2 段、**專案端追加 allow 實測無效 → 方案 A 停用、改方案 B**、括號子運算式與 `$` 變數存取會被拒（§9.3 改強制兩步）、scanner 用**原始字串**比對（字面同形鐵律）、`*.git/*` 等 pattern 全數驗證有效、反斜線會正規化但 `cmd /c` 指令須留反斜線。**尚未覆驗的一條**：真實專案＋TUI 形態下「專案端 config 能否追加 allow」（本機 CLI 找不到專案本地 agent，見 `experiments.md` 二.2）。
+1. **實驗先行（R1 八題，在寫任何 agent 檔之前）**：拿一個最小假裝的 kit（一個 subagent + 一份假 profile + 兩條規則）實測：` *` 尾綴匹配、尾巴三段式第 3 段能否翻回第 2 段、`.md` 與 jsonc 的附加次序、**含括號子運算式是否被 scanner 接受**、**scanner 比對用的是原始字串還是重組字串**、`*.opencode/*` 是否匹配點開頭的相對路徑、**shell 資源是否做反斜線正規化**。結論寫進 `docs/install.md`，據此確認 §7.3 走方案 A 或 B、§9.3 是否改兩步寫法、§7.1 各條 resource 字面形是否要改。同一站也要驗：`tools/normalize-forms.ps1` 連跑兩次內容不變（冪等），並確認在 PS7 下不寫出 BOM。**本站已於 2026-11-11 完成**，結果見 `docs/experiments.md` 與 §17.11：` *` 尾綴成立、三段式第 3 段可翻回第 2 段、**專案端追加 allow 實測無效 → 方案 A 停用、改方案 B**、括號子運算式與 `$` 變數存取會被拒（§9.3 改強制兩步）、scanner 用**原始字串**比對（字面同形鐵律）、`*.git/*` 等 pattern 全數驗證有效、反斜線會正規化但 `cmd /c` 指令須留反斜線。**尚未覆驗的一條**：真實專案＋TUI 形態下「專案端 config 能否追加 allow」（本機 CLI 找不到專案本地 agent，見 `experiments.md` 二.2）。
 2. **批量改字後必經人工複核（§17.6 的教訓，列為常設紀律）**：任何用腳本做的字形／空格批量替換，跑完必須**人工重讀被改動的行**（看 MISS 輸出＋隨機抽查＋全文再掃一次 `$suspects`），並確認換行字元未被整檔轉換（本 repo 以 `.gitattributes` 鎖 `eol=lf`）。第 3 輪我就是因為只看腳本輸出就宣稱「已清乾淨」，結果一邊修字形、一邊製造新問題，還把一句話替換壞成重複句（該事故記錄留在 §17.6，不在此重複）。
 3. repo 骨架與 `docs/writing-a-pack.md`（把 §6.1 的紀律與 §6.2 的 `covers` 退件清單寫成可執行步驟）。
 4. 抽 pack：從現有 agent 逐條搬到 4 個 pack（**先抽 pack 再改主體**，避免知識遺失）。
@@ -722,7 +724,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 
 | # | 風險 | 影響 | 對應做法 |
 |---|---|---|---|
-| R1 | ~~跨來源次序官方未記載~~ → **已實測（2026-11-11，`docs/experiments.md`）**：agent `.md` 規則排在設定檔之後，地板 deny 蓋掉專案端 allow；scanner 用**原始字串**逐字比對；括號子運算式與 `$` 變數成員存取會被拒（未 allow 的子指令使整案 DENIED）；反斜線**會**正規化 | 方案 A 失效 → kit 預設已改**方案 B**（§7.3.0／§7.3.0.1）；§9.3 junction 改**強制兩步**；§5.1.1#1 探針改 `Get-Location`；§7.1 allow 只寫斜線形、程序檔的 `cmd /c` 保留反斜線 | **剩一條待覆驗**：在真實專案＋TUI 安裝形態重驗第 3 題（專案端 config 能否追加 allow）。在此之前方案 A 停用。另 `opencode run` 的 shell 落在 **service 綁定的專案目錄**而非呼叫端 cwd（`experiments.md` 二.1），自動化實驗必須先 `Get-Location` 確認落點、涉及寫檔一律用絕對路徑 |
+| R1 | ~~跨來源次序官方未記載~~ → **已實測（2026-11-11，`docs/experiments.md`）**：agent `.md` 規則排在設定檔之後，地板 deny 蓋掉專案端 allow；scanner 用**原始字串**逐字比對；括號子運算式與 `$` 變數成員存取會被拒（未 allow 的子指令使整案 DENIED；第 8 題只記錄到 DENIED，**原因未經錯誤訊息確認**）；反斜線**會**正規化 | 方案 A 失效 → kit 預設已改**方案 B**（§7.3.0／§7.3.0.1）；§9.3 junction 改**強制兩步**；§5.1.1#1 探針改 `Get-Location`；§7.1 allow 只寫斜線形、程序檔的 `cmd /c` 保留反斜線 | **剩一條待覆驗**：在真實專案＋TUI 安裝形態重驗第 3 題（專案端 config 能否追加 allow）。在此之前方案 A 停用。另 `opencode run` 的 shell 落在 **service 綁定的專案目錄**而非呼叫端 cwd（`experiments.md` 二.1），自動化實驗必須先 `Get-Location` 確認落點、涉及寫檔一律用絕對路徑 |
 | R2 | pack 是「憑現有專案抽出」，換技術棧時 4 個 pack 都不適用 | 新專案只剩主體流程 + profile 的通用檢查 | init 在沒有任何適用 pack 時明確告知「本次只有通用檢查」，並把 profile 手寫知識的比重提高（熱點表、安全慣例必填） |
 | R3 | `resolved.md` 是產物，可能被手改或忘記重譯；而**執行期無法算 checksum**（`node -e` 會被 scanner 拒、不該為此事擴張 reviewer 白名單） | 用了舊規則版還看不出來 | 執行期比「啟用清單＋關鍵識別欄」一致性（§6.3，純 `read` 可達）；checksum 交 `compile`／`inspect`（`Get-FileHash`）；README 把「升級 kit 後各專案重跑 compile」寫成固定步驟；**殘留風險如實標明，不宣稱已擋死** |
 | R4 | `instructions` 注入會讓 profile 進入該專案**所有** agent 的上下文（含內建 build） | token 增加、可能干擾無關任務 | 控制在兩檔、目標單檔 ≤ 120 行（**超過即為警告而非阻斷**：`inspect` 提示「注入內容已達 N 行」，由你決定要不要把熱點表精簡或改用 §4.2.2 的「主體指示 read」備援路）；需要更精緻時改用「主體指示 read」的備援路（§4.2 D6 的後段） |
@@ -756,7 +758,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | agent 數量 | 4 個（三開發角色 + `setup` 設定專用） |
 | probe 執行者 | `setup`（其 `subagent` 唯一例外是 allow `frontend-devkit/reviewer`，因只有 setup 能寫設定檔）；結果記在 `project.md` 的 `## 安裝紀錄`，不記在 `resolved.md`（D17） |
 | 安全檢查封頂 | `security/*` pack 檢查項只能被覆寫成更嚴，不得取消／降級；企圖免除者 reviewer 照樣查 + 列「嚴重」（D18） |
-| allow∩deny 必須為空（**方案 A 的前提**） | 專案端 allow 不得命中主體尾巴第 1、2 段 deny（比對時**排除** `resource:"*"` 地板），`setup` 寫入前與 `inspect` 都機械比對（D19）。**實測後狀態**：方案 A 停用 → 本條轉為「未來若覆驗成功啟用方案 A，此檢查必須先存在」的保留要求；方案 B 下專案端不寫 shell 規則，故無此交集 |
+| allow∩deny 必須為空（**方案 A 保留條款：僅在 §7.3.0 覆驗成功、方案 A 啟用後才適用**） | 專案端 allow 不得命中主體尾巴第 1、2 段 deny（比對時**排除** `resource:"*"` 地板），`setup` 寫入前與 `inspect` 都機械比對（D19）。**實測後狀態**：方案 A 停用 → 本條轉為「未來若覆驗成功啟用方案 A，此檢查必須先存在」的保留要求；方案 B 下專案端不寫 shell 規則，故無此交集 |
 | 依賴安裝分兩族 | 不可變（`npm ci`、`pnpm install --frozen-lockfile`、`yarn install --frozen-lockfile`）allow；可變（install／add／i）deny；「例外 allow」只准許出現在主體陣列內（D20，尾巴三段式） |
 | 竄改偵測 | `inspect` 以 `kitRoot` 源頭素材**在上下文重建內文**、**排除檔頭動態欄**後**逐行**比對（誠實標明：LLM 逐行比對，非機械 diff），不只比 checksum（D21） |
 | profile **值**的白名單（第 4 輪嚴重項） | `設定檔路徑`、`kitRoot`、`worktree 目錄`、`環境檔` 四欄只能取白名單值，`setup` 寫入前與 `inspect` 每輪都驗，非法即停止（D23，§5.1.2） |
@@ -809,7 +811,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 |---|---|---|---|
 | G1 | §17.3 宣稱 S-1 已採納，但 `project.md` 範本仍留 `## 未知（TBD）` 小節——**我的不實記載** | 刪除該小節，並在 §5 開頭加「未知只寫在欄位值上，不另設總表」；§17.3 的敘述改與實際內容一致 | 已修（並承認是自己寫錯，不是 reviewer 誤判） |
 | G2 | developer 的 `edit` deny 寫成 `*.opencode.json`／根 `opencode.json`：漏 `opencode.jsonc`、漏 worktree 內副本、字面根形匹配不到 | 改為 `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`（`*` 跨 `/`）；§13 關卡 1 實測四種路徑形＋jsonc（連 D19 一起驗） | 已修 |
-| G3 | 「兩種次序都不偏鬆」的論證缺前提：專案端窄 allow 若命中主體 deny，且 jsonc 排在後面，地板會被翻掉 | 新增 §7.3.4 第 2、3、6 點（前提＋機械檢查＋「例外 allow 只准許許在主體陣列」）與 D19；§11 加「allow∩deny 非空＝嚴重」 | 已修 |
+| G3 | 「兩種次序都不偏鬆」的論證缺前提：專案端窄 allow 若命中主體 deny，且 jsonc 排在後面，地板會被翻掉 | 新增 §7.3.4 第 2、3、6 點（前提＋機械檢查＋「例外 allow 只准許在主體陣列」）與 D19；§11 加「allow∩deny 非空＝嚴重」 | 已修 |
 | G4 | probe 執行者不成立（init／inspect 是 setup，而 setup `subagent deny` 派不到 reviewer），且記錄位置檔頭／檔尾互相矛盾、重譯會抹掉 | D17：setup 的 `subagent` 改為「deny，唯一例外 allow `frontend-devkit/reviewer`」；probe 結果寫進 `project.md` 的 `## 安裝紀錄`，`resolved.md` 檔頭只留引用行（§8.2 重寫） | 已修 |
 | G5 | probe 第 1 條可用 `git rev-parse`（主體本就 allow）→ 零判別力；關卡 1 在尚未 init 時就跑 probe | §8.2 第 1 點定為「必須用只來自專案端 jsonc 的 gate 指令」；關卡 1 只驗地板方向，次序判別移到關卡 2 | 已修 |
 | G6 | reviewer 白名單缺 `New-Item -ItemType Junction *`、`Resolve-Path *`、`npm ci *`、`git worktree remove --force .worktrees/review-*`、`git rev-parse／log／show／fetch／merge-base／ls-tree／cat-file／check-ignore`——程序檔折進 resolved 後，這些動作會全數被地板 deny 擋死 | §7.1 reviewer 列補齊整套（含 worktree 就緒組），並註明 `Get-FileHash` 不給 reviewer（歸 setup，見 S5） | 已修 |
@@ -827,7 +829,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | S5 | reviewer 白名單有 `Get-FileHash *` 卻與「checksum 只歸 compile／inspect」矛盾 | 從 reviewer 移除，保留在 setup | 已修 |
 | S6 | `npm audit fix*` 違反自家「`cmd sub *`」格式 | 改 `npm audit fix *` | 已修 |
 | S7 | 「第 1 輪審核後的 6 項對照」實際 22 項 | 改為「第 1 輪 16＋4＋2、第 2 輪 13＋8，全部集中 §17」 | 已修 |
-| S8 | R4 的「單檔 ≤ 120 行」與 resolved.md 体量（4 pack + 9 條程序）可能衝突 | R4 改為「超過即警告而非阻斷」，並給出取捨路徑 | 已修 |
+| S8 | R4 的「單檔 ≤ 120 行」與 resolved.md 體量（4 pack + 9 條程序）可能衝突 | R4 改為「超過即警告而非阻斷」，並給出取捨路徑 | 已修 |
 
 ### 17.5 第 2 輪「疑問」的決定
 
@@ -869,12 +871,12 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 
 | 疑點 | 我的裁定與理由 |
 |---|---|
-| probe 由誰派、gate allow 寫進哪個 agent 節點 | 專案端 gate allow 一律寫進**被派者自己的節點**：reviewer 用的寫 `frontend-devkit/reviewer`，developer 用的寫 `frontend-devkit/developer`；派工文本（setup→reviewer 的 task prompt）要**明文授權該條指令**，否则 reviewer 的「絕不嘗試白名單外指令」鐵則會自己拒絕執行 probe |
+| probe 由誰派、gate allow 寫進哪個 agent 節點 | **（本決定已於 R1 後作廢：方案 B 下專案端不寫 shell 規則；保留原文供追溯）** 當時的寫法是：專案端 gate allow 一律寫進**被派者自己的節點**：reviewer 用的寫 `frontend-devkit/reviewer`，developer 用的寫 `frontend-devkit/developer`；派工文本（setup→reviewer 的 task prompt）要**明文授權該條指令**，否則 reviewer 的「絕不嘗試白名單外指令」鐵則會自己拒絕執行 probe |
 | D14「deny 一律最後」vs D20「例外 allow 緊接 deny」的措辭衝突 | 採**三段式**（D20）並把 D14 限定為「**真地板群**不可被覆寫」；第 2 段是「可被第 3 段翻回」的，文字已分開寫，不再共用「deny 一律最後」一句話 |
 | 主體是否常駐基本安全項（多約 5 行提示詞） | **採納**（D22）。理由：安全地板若能在「配置層」被取消，就不是地板；5 行成本相對極小，且這是唯一能擋住「停用 pack」的路徑 |
 | `## 模型` 小節是否保留（「存在只為了宣告不存在」） | **保留**。它是給人的防呆（避免有人在 profile 裡綁 model 造成雙真相），成本一行；§7.4 已加交叉引用 |
 
-### 17.8 第 4 輪獨立審核（VERDICT: FAIL，2 嚴重／10 一般／7 建議＋6 阻擋實作）→ 採納情形
+### 17.8 第 4 輪獨立審核（VERDICT: FAIL，2 嚴重／9 一般／7 建議＋6 阻擋實作；我當時對你轉述為「15 一般／8 建議」，屬口徑灌水，以本表為準）→ 採納情形
 
 | # | 發現 | 落點 |
 |---|---|---|
@@ -889,7 +891,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | 一般 #9 | 舊文未同步：§13 關卡 6 還用「無 shell 規則＝全開」的錯威脅模型語彙；§11／§16 還寫「重建暫存 resolved 後逐行 diff」（D21 已定稿為上下文重建＋排除檔頭＋非機械 diff） | 三處同步；關卡 6 改測「移除專案端 agents 節點後，主體地板仍拒非白名單指令」 |
 | 一般 #10 | §9.6 反斜線指令 vs 斜線 allow：官方「反斜線正規化」寫在通用 Matching，但同頁說 shell 是 raw text，是否適用 shell **未明示** | 具名 allow **兩形並列**（`*` 與 `\*`）；新增 **R1 第 7 題**；明文「定案前該 allow 屬草稿」，並要求程序素材與 spec 統一斜線寫法 |
 | 一般 #11 | §17.6 說「完整脈絡見 git log」不實——本 repo **0 個 commit** | 改為「見 §17 各輪紀錄」；**版本基線另請你裁示**（依你的規則：commit 訊息先給你審） |
-| 建議 7 項 | 「24 組」實為 26；reviewer 的 `Test-Path .worktrees/*`／`cmd /c rmdir .worktrees/*` 未收 `review-*`（能动到開發 worktree）；§6.4 與 §3 第 0 點重疊；指令檔未禁止 `!`…` 殼塊（官方明示它在 agent 權限流程**外**執行）；`git ls-tree`／`cat-file` 缺用途；`pass3` 有一條自我替換規則；D12「跑八關」計數含關 0／關 8 | 全數採納：計數改正、兩條收 `review-*`、§6.4 去重、§8 加「六個指令檔一律不得使用 shell 塊」、補用途（比對既有測試是否被刪改）、刪除無效規則、D12 改「關 1～7」 |
+| 建議 7 項 | 「24 組」實為 26；reviewer 的 `Test-Path .worktrees/*`／`cmd /c rmdir .worktrees/*` 未收 `review-*`（能動到開發 worktree）；§6.4 與 §3 第 0 點重疊；指令檔未禁止 `!`…` 殼塊（官方明示它在 agent 權限流程**外**執行）；`git ls-tree`／`cat-file` 缺用途；`pass3` 有一條自我替換規則；D12「跑八關」計數含關 0／關 8 | 全數採納：計數改正、兩條收 `review-*`、§6.4 去重、§8 加「六個指令檔一律不得使用 shell 塊」、補用途（比對既有測試是否被刪改）、刪除無效規則、D12 改「關 1～7」 |
 | 新風險 #3 | §7.3.5#2 的寫入性清單只有「旗標類」，缺**檔案系統寫刪／任意執行**類（`rm`、`Remove-Item`、`Move-Item`、`Set-Content`、`Invoke-Expression`…）→ `## 指令` 填 `rm -rf *` 級條目時，寫入性檢查與 allow∩deny 比對**都放行**（主體 deny 無 rm 家族） | §5.1.2 末段補清單與「reviewer 節點 allow 僅限測試／lint／build／唯讀工具類」；實作時應把這類指令也加進主體第 1 段地板 |
 | 阻擋 #2／#3 | 方案 B 只有取捨表、§9.3 兩步寫法只有半句話 → q3／q4 失敗時該分支等於空白 | 新增 **§7.3.0.1**（方案 B 的逐條白名單、靜態清單涵蓋不到時的「需人工執行」行為、模式記錄）與 §9.3 **兩步降級寫法**（含回傳值的注入防護驗證） |
 
@@ -917,10 +919,37 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | 第 3 題：專案端 jsonc 追加的 allow 被主體 `.md` 地板 deny 蓋掉（方案 A 不是偏嚴，是**全數失效**） | §7.3.0 改為「方案 A 實測不通過／**方案 B 為預設**」；D13、D19、§7.3.4 的專案端 allow 機制依方案 B 重寫；保留復活條件（真實專案＋TUI 形態覆驗） |
 | 第 4 題：`Write-Output (Resolve-Path .).Path` 被拒（括號內指令成為次指令） | §9.3 兩步寫法由「降級備援」升為**強制**，且 `Resolve-Path node_modules` 要個別 allow |
 | 第 5 題：scanner 以**原始字串**逐字比對、不重組參數 | 新增**字面同形鐵律**（§7.3.2、§9.3）：`X`／`X Y`／`X -Path Y` 是三條規則；§7.1 的具名 allow 不再是草稿，但要與程序檔字面逐字對齊 |
-| 第 6 題：四種路徑形（含 `.git\hooks\`、worktree 內 `opencode.json`、`opencode.jsonc`）全數被拒 | D24／G2 的 pattern 組**驗證通過**；§13 關卡 1 由「首次驗證」降為「回歸抽驗」 |
+| 第 6 題：六種路徑形（含 `.git\hooks\`、worktree 內 `opencode.json`、`opencode.jsonc`）全數被拒 | D24／G2 的 pattern 組**驗證通過**；§13 關卡 1 由「首次驗證」降為「回歸抽驗」 |
 | 第 7／7b 題：反斜線會正規化，但 `cmd /c` 指令須留反斜線 | §7.1 結論塊與 reviewer 列改為「allow 斜線形、給 cmd 的指令反斜線形」，撤銷兩形並列 |
-| 第 8 題（新測）：`$PSVersionTable.PSVersion.ToString()` 被拒，即使 `Write-Output *` 已 allow | §5.1.1#1 探針改 `Get-Location`（無 `$`、無括號）＋`cmd /c ver` 交叉驗證；§7.3.2 註明「`$` 變數成員存取與括號子運算式屬高危形，程序檔不要這樣寫」 |
+| 第 8 題（新測）：`$PSVersionTable.PSVersion.ToString()` 被拒，即使 `Write-Output *` 已 allow | §5.1.1#1 探針改 `Get-Location`（無 `$`、無括號）＋`cmd /c ver` 交叉驗證；§7.3.2 補兩行紀律（字面同形、`$`／括號形禁用） |
 | 方法學：`opencode run` 的 shell 落在 **service 綁定的專案目錄**（實測落在另一個真實專案）；新專案 `.opencode/agents/*.md` 用 `--agent` 找不到，同格式全域 agent 找得到 | 寫進 `docs/install.md` 的「自動化驗證注意」；§13 各關執行前先 `Get-Location` 確認落點、涉及寫檔一律用絕對路徑；第 3 題覆驗改用 TUI＋真實安裝形態。**本次已查核該被波及專案的未 commit 檔案 mtime 為 2026-11-04，確認非實驗造成，且實驗未對其寫入任何檔** |
+
+### 17.12 第 5 輪獨立審核（VERDICT: FAIL，5 嚴重／8 一般／5 建議＋6 阻擋）→ 已修與**未修完的清單**
+
+| # | 發現 | 狀態 |
+|---|---|---|
+| 阻擋 1／嚴重 | §7.1 權威角色表仍以方案 A 語彙寫 gate（「profile 各 gate」「專案端追加」） | **已修**：developer／reviewer 兩列改引用 §7.3.0.1 靜態清單＋「清單外→需人工執行／逐次彈窗」 |
+| 阻擋 2／嚴重 | setup 白名單沒有新探針（只有 `Write-Output *`，實測會被拒）→ init 的 shell 偵測必死 | **已修**：補 `Get-Location`、`cmd /c ver` 精確形，`Write-Output *` 去「探針」標籤 |
+| 阻擋 3／嚴重 | §5.1 偵測表仍寫「`$PSVersionTable` 探針（唯一可行做法）」，與 §5.1.1#1 對打 | **已修**：該列改為「`$`／括號形不可用，探針用 `Get-Location`」 |
+| 阻擋 4／嚴重 | §17.11 與 experiments 的行動清單有 4 處「宣稱落地、實際沒落地」（D19、§7.3.4、§7.3.2 兩行） | **部分**：§7.3.2 已補「字面同形鐵律」與「`$`／括號形禁用」兩行；D19 已加「方案 A 保留條款」前綴；§7.3.4 已在節首加現況標記與 B 紀律。**代償**：同輪又出現 2 個 MISS（見下方未修 1、2），所以本表把未修項目老實列出來，不再宣稱全清 |
+| 阻擋 5／嚴重 | probe 全鏈在方案 B 下不可執行（第 1 條「必須只來自專案端 jsonc」永無來源） | **已修**：§8.2 重定義為「版本迴歸偵測」（第 0 條 `Get-Location`、第 1 條靜態清單 gate、第 2 條地板）；§7.3.4#5、§13 關卡 2、profile 範本 `## 安裝紀錄` 同步；次序判別整段移入 §7.3.0 的方案 A 復活檢測 |
+| 阻擋 6／嚴重 | §12 與 §7.3.4#7 的 developer deny 仍只三條（缺 `*.git/*`） | **已修**：兩處補第四條，並改標「六種路徑形已由 experiments 第 6 題實測」、關卡 1 降為回歸抽驗 |
+| 一般 | §11「未批准的可寫入指令寫進 allow」列、`/review` 二次確認與 §3 不同步、口述 gate 模式的降級敘述是方案 A 推論 | **部分**：§11 二次確認列已補 `/review` 例外（不開始審核＋固定句）；口述模式已改寫為**三角色分別降級**（reviewer 清單內可跑／developer 彈窗／orchestrator 不受影響）；**§11「寫進 allow」那列尚未改**（未修 3） |
+| 一般 | §9.3 把「`New-Item … -Target (…)` 實測 DENIED」寫成事實，但實測只測過 `Write-Output` 形 | **已修**：改為「依第 4 題機制**推定**，尚未直接實測 `New-Item` 形，關卡 4 要實測」 |
+| 一般 | §7.3.3 範例與示範文字仍是 `cmd /c rmdir .worktrees/*`，未收 `review-*`（第 4 次同型錯誤：改了表格沒改範例） | **已修**：範例與說明都收 `review-*` |
+| 一般 | 計數不實：R1「七題」（實八題）、§5.1.2「另外兩欄」（實四欄）、§17.11「四種路徑形」（實六種）、§17.8 表頭「10 一般」（報告實 9 一般） | **已修**：四處計數改正；並加入一条自我修正——我對你在第 4 輪口述的「15 一般／8 建議」是**口徑灌水**，以 §17.8 表為準 |
+| 一般 | 「方案 A 全數失效／永久停用」是全稱句，但實測只測過「全域 agent × 全域 config」；且「找不到專案本地 agent」高度可能是**我的 service 綁定操作問題** | **已修**：§7.3.0 與 R1 措辭軟化為「本次形態不通過」；復活條件加入**三步先決檢測**（先 `Get-Location` 確認綁定、再確認專案 agent 出現在清單、才測 allow），並明文「三步驟任一失敗先修操作、不下平台結論」 |
+| 建議 | resolved.md 檔頭缺「權限模式：B」；`inspect` 摘要缺兩項；§17.8 落點引用錯一格（hook 告警在步驟 9 而非步驟 8）；§12 缺「回歸防護五步」遷移列；關卡 0 措辭 | **未全修**：見下方未修 4、5 |
+
+#### 本輪**未修完**、留給下一輪或實作前清理的清單（不宣稱已修）
+
+1. §8 `inspect` 的檢查摘要缺兩項：「profile `## 指令` × 主體靜態清單的比對結果」與「專案端設定不得含 shell 條目（方案 B 紀律）」——§7.3.4 節首已寫這條紀律，但 `inspect` 清單還沒列，實作會漏做。
+2. §12 遷移表缺「回歸防護五步（現行 `developer.md` §回歸防護）」對應列；全文兩度引用「五步」卻從未展開內容，抽主體時易漏。
+3. §17.8（第 4 輪表）有一格落點引用錯：宣稱「README hook 告警（§14 步驟 9）」，但步驟 9 現列的是 build 告警；hook 告警實際在 §11 的 `.git/` 列。
+4. （已修，留此紀錄）`resolved.md` 檔頭已補「權限模式（A／B）」；§11 那整列「未批准的可寫入指令寫進 allow」已改寫為 B 的四道處置。
+5. §15 R9／R10 仍用方案 A 語彙（「profile 逐 script 具名 allow」「提供 `## 額外 shell` 白名單」）：第二道牆應改「主體靜態清單＋需人工執行」，R10 應改「靠 `Allow always` 存成專案級持久 allow，並由 `inspect` 審查存下的規則」。
+6. **方案 A 覆驗尚未做**：需要一個能正確綁定到探測專案的環境（本次 `opencode run`／`--standalone` 都把 shell 落在 service 的專案目錄）。這直接決定 §7.3.0 是「停用」還是「作廢」，也決定 D19、§7.3.4 第 1–6 點要不要整段刪除。**我不在你的機器上重啟共用 service**（會波及你正在跑的 session），所以這條留給你決定時機與方式。
+
 
 
 
