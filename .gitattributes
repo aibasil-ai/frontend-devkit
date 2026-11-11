@@ -1,0 +1,10 @@
+* text=auto eol=lf
+
+*.md text eol=lf
+*.ps1 text eol=lf
+*.json text eol=lf
+*.jsonc text eol=lf
+
+# 二進位與產物
+*.png binary
+*.ico binary
