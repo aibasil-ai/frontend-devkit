@@ -502,7 +502,7 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
    - `install-per-worktree`：在 worktree 內依 profile 的依賴安裝指令執行（例 `npm ci`／`pnpm install --frozen-lockfile`），bash `workdir` 必須是 worktree 絕對路徑。
    - `none`：不建 worktree（配合 `worktreePolicy: never`）；此種專案的審核目標恆為 `--working`，且 §9.6 的兩步清除化為「無 worktree 可清」，但仍要在結束時檢查 `git worktree list` 有沒有前次殘留。
    - 偵測到 pnpm／yarn workspace 或 `node_modules` 非平面結構時，init 必須把預設值從 `junction` 改為 `install-per-worktree` 並說明原因。
-4. 環境檔：依 profile 清單逐一 `Copy-Item` 進 worktree（現在只 `.env`，可擴充 `.env.local`）。複製前提醒：這些檔案含密鍵，**不得出現在回報或 commit 內容裡**；若 worktree 目錄未被 `.gitignore` 排除（§5.1.1 第 4 條的檢查），要先警告再複製。
+4. 環境檔：依 profile 清單逐一 `Copy-Item` 進 worktree（現在只 `.env`，可擴充 `.env.local`）。複製前提醒：這些檔案含密鍵，**不得出現在回報或 commit 內容裡**；若 worktree 目錄未被 `.gitignore` 排除（§5.1.1 第 4 條的檢查），要先警告再複製。**（缺陷 O，第 6 站關卡 4 補）** profile 的 `環境檔` 清單非空時，`compile` 與 `inspect` 都要對每個檔驗 `git check-ignore -v <檔>`：未被忽略就醒目警告——它會被複製進 worktree，可能被 commit，也可能混進 `--working` 的未追蹤清單。kit **不得**自行修改專案的 `.gitignore`，只給建議指令。
 5. 審核 worktree：detached、名 `review-<sha7>`（`git rev-parse --short=7`）、結束**必清**（含失敗與中途出錯）；先 `Test-Path .worktrees/review-<sha7>` 檢查殘留並比照處理。**目錄不存在但 `git worktree list` 已登記**時（`git worktree add` 會失敗）：如實回報並請你處理——reviewer 沒有 `git worktree prune` 權限，也不得嘗試白名單外指令。
 6. **清除順序（保命鐵則，主體與程序檔都要標註，三種 depStrategy 一體適用）**：先 `cmd /c rmdir .worktrees\<名稱>\node_modules`（只移連結；對實體目錄或不存在路徑會失敗，失敗可忽略），**再** `git worktree remove --force .worktrees/<名稱>`。跳過第一步在 Windows 可能跟隨 junction 把主工作區 `node_modules` 一起刪除。**`install-per-worktree` 也不例外**：先 rmdir 一步對實體目錄會失敗但不會誤刪，保留這一步可以讓程序只有一種寫法、不會因策略不同而忘記。
 7. **清除前必查未 commit 殘留**：在該 worktree 跑 `git status --short`，有未 commit 檔案（例如 developer 產生的暫物、複製进去的 `.env`）時**先告知你再清除**——`--force` 會把它們一起丟棄。
@@ -542,6 +542,10 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 ### 10.4 回報格式
 
 developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`、`ISSUES:`、`既有問題`、`疑問`、`回歸檢驗`、`建議手動回歸檢查`）與嚴重度分級表照現行規格保留，只把內容來源改為 profile／pack：
+
+> **第 6 站關卡 4 補的兩條引用紀律（缺陷 M、N）**：
+> - **目標可追溯（M）**：`目標：` 必須寫明**型態＋基準 sha＋範圍**；審未 commit 變更時另記 `git diff <基準> | git hash-object --stdin` 的指紋。否則 commit 之後無法機械證明「被審的內容＝被 commit 的內容」——關卡 4 實測是靠 diff 統計剛好對上，屬僥倖。
+> - **行號與數量（N）**：developer 與 reviewer 的所有「檔案:行號」、測試數、diff 統計都必須來自本次 `read`／指令輸出，回報前逐一核對。實測：developer 兩個行號偏 3 行、測試數「本檔 7 個」實為 6；reviewer 把 `App.vue:39` 的 `min-height` 引為 `:48`。
 
 | 嚴重度 | 定義（參數化後） |
 |---|---|

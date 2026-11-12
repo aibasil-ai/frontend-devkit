@@ -247,3 +247,48 @@
 
 > 問卷本身還有一個小缺口：只有兩個選項，缺「我去補設定／取消」這條路。三選項規則已寫進 orchestrator，下一輪會驗。
 
+## 關卡 4（worktree＋dev／review 迴圈）— **通過**，並測出 M、N、O 三個缺陷
+
+完整迴圈都跑到了：`worktreePolicy=ask` → 建 `feature-dark-mode-toggle` → junction（`LinkType=Junction`）→ dev 第 1 輪 → reviewer 回 8 個 ISSUES＋3 條裁決 → dev 第 2 輪逐項修正 → review 第 2 輪 `VERDICT: PASS`（5 條建議、0 阻擋）→ 使用者審 commit 訊息 → orchestrator commit `938bc49`（developer 的 `git commit` 是 deny，所以只能由 orchestrator 做）→ fast-forward 併回 `main` → 清 worktree。
+
+### 我獨立複驗的（不採信自述）
+
+| 宣稱 | 實測 |
+|---|---|
+| 基準測試未動 | `git diff ed9221e..938bc49 -- test/baseline.test.js` 為空 ✅ |
+| `style.css` 只新增 | `53 新增 / 0 刪除` ✅ |
+| 無 phantom dependency | 只剩 `from 'vue/server-renderer'`；`vue` 自身相依 `@vue/server-renderer@3.5.45` ✅ |
+| `toggleLabel` 已移除 | `git grep` 0 命中 ✅ |
+| 特異性 (1,2,0) > (1,1,0) | 算得對 ✅ |
+| 「watchEffect 沒跑斷言必失敗」 | 成立：`documentStub.dataset` 只有那一個寫入者，`toBe('light')` 能過就證明寫入真的發生 ✅ |
+| 7 tests／build／CSS 5.41 kB／JS 67.11 kB | 我自己跑，數字完全一致 ✅ |
+| 清 worktree 沒傷到主工作區 | `.worktrees` 空、`worktree list` 只剩主工作區、`node_modules` 40 項且 vue／vitest 都在（＝有先 `rmdir`）✅ |
+| 合併後主線健康 | `7 passed`、`build` 成功 ✅ |
+
+審核品質是這輪最高的：reviewer **自己**跑了 `--sequence.shuffle`（developer 沒做）、讀 `dist` 的 CSS 輸出順序驗四種組合、`git check-ignore` 驗 `dist`、`--ignore-cr-at-eol` 驗換行；「疑問」段還主動承認**無法機械驗證** developer 的「動手前 7 tests」，沒有因此放水。
+
+### 缺陷 M：`VERDICT` 不可追溯（審核目標沒有 sha／指紋）
+
+review 是在 commit **之前**對工作目錄跑的（依 §9 不建審核 worktree，合理），但輸出只寫「未 commit 改動」。commit 之後就沒有任何機械方法證明「被審內容＝commit 內容」——這次是我用 `+258/−1`、`App.vue +61/−1`、`style.css +53`、`test 105`、`composable 40` 逐項對上才敢說沒漂移，**屬僥倖**。
+
+修法：`目標：` 必須含型態＋基準 sha＋範圍；審未 commit 變更時加記 `git diff <基準> | git hash-object --stdin` 指紋（已寫進 `reviewer.md` §1／§6 與主檔 §10.4）。
+
+### 缺陷 N：行號與數量「憑印象」
+
+| 誰 | 錯什麼 |
+|---|---|
+| developer | `useDarkMode.js:15-20`（實為 18-20）、`:33`（實為 30）——都偏 3 行；「本檔 7 個測試」實為 **6**（7 是含 baseline 的總數） |
+| reviewer | `.app-shell` 的 `min-height` 引為 `App.vue:48`（實為 `:39`，48 是 `padding`） |
+
+兩者的**實質判斷都正確**，只有引用不精確；但 reviewer 的行號正是下一輪 developer 的施工依據，錯一處就多一輪。修法：`setup.md` §8 那條「行號必須來自本次 `read`」目前只管 setup → 已同步加進 `developer.md` §10 與 `reviewer.md` §1／§6。
+
+> 順帶：這是「引用不精確」第三次出現（前兩次是關卡 3 的路徑標錯與反向 stale）。共同根因都是**用記憶代替重讀**，不是說謊。
+
+### 缺陷 O：`.env` 沒被 `.gitignore` 忽略
+
+`git check-ignore -v .env` 退出碼 **1**（app-a 的 `.gitignore` 沒有任何 `.env` 規則）。本例 `<ENV_FILES>`＝無，所以還沒有東西會被複製，**目前無風險**；但 profile 一旦列了環境檔，`compile` 之後它就會進 worktree 並處於「可被 commit」的狀態。修法：`setup.md` §4 新增 2b、主檔 §9 第 4 條補述——`compile`／`inspect` 要對每個環境檔驗 `git check-ignore`，未忽略就醒目警告（kit 不改專案 `.gitignore`）。
+
+### 未阻擋但值得記的 5 條 reviewer 建議
+
+`:root` transition 缺 `prefers-reduced-motion` 保護、只有底色／文字過渡（框線與 `--social-bg` 仍瞬切）、`min-height: 100svh` 在 `App.vue:39` 與 `style.css:218` 重複、`@click` 的真 DOM 綁定無自動化覆蓋（需新增 jsdom／test-utils）、`useDarkMode` 非單例（目前僅一處呼叫）。全部屬建議級，已在 app-a 留下紀錄。
+
