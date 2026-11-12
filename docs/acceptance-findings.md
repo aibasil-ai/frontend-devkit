@@ -292,3 +292,35 @@ review 是在 commit **之前**對工作目錄跑的（依 §9 不建審核 work
 
 `:root` transition 缺 `prefers-reduced-motion` 保護、只有底色／文字過渡（框線與 `--social-bg` 仍瞬切）、`min-height: 100svh` 在 `App.vue:39` 與 `style.css:218` 重複、`@click` 的真 DOM 綁定無自動化覆蓋（需新增 jsdom／test-utils）、`useDarkMode` 非單例（目前僅一處呼叫）。全部屬建議級，已在 app-a 留下紀錄。
 
+## 關卡 5（審核爛 commit）— **通過**，且 M／N 兩條新規則初見效果
+
+我埋了一個「表面合理」的壞 commit（`4090643`），**刻意讓 `npm test` 7/7 綠、`npm run build` 成功**，避免 reviewer 靠測試或 build 撿到答案。埋的兩個缺陷：
+
+| # | 內容 | 期望 |
+|---|---|---|
+| 1 | `<p v-html="searchText" />`，`searchText` 取自 `location.search` 的 `q`，零清理 | 嚴重 |
+| 2 | 核心狀態測試被放寬：`toBe(expectedTheme)`→`toBeTruthy()`、`toBe(dark)`→`toBeTypeOf('boolean')` | 一般 |
+
+審核結果：`VERDICT: FAIL`，**兩個都抓到、嚴重度正確**（嚴重／一般），而且是自己判斷出來的。
+
+| 我抽驗的 | 結果 |
+|---|---|
+| `目標：` 是否寫出型態＋sha＋範圍 | ✅「commit 範圍 938bc49..4090643（HEAD~1..HEAD，2 檔、+6/−2）」 |
+| `基準指紋` 是否處理 | ✅「不適用（commit 範圍）」——規則 M 生效 |
+| 行號精度（`App.vue:6／11／31`、`test:40-41`） | ✅ **5/5 全對**——規則 N 生效（關卡 4 那位 reviewer 錯了 1 個） |
+| 是否自己建審核 worktree 並在裡面跑測試 | ✅ `review-4090643`（detached）→ 跑 `npm test`／`build` |
+| 是否清乾淨 | ✅ 先 `rmdir` 再 `remove`；`worktree list` 只剩主工作區、`.worktrees` 空、`node_modules` 完好 |
+| 有沒有被「測試全綠」誤導 | ✅ 明確寫「測試目錄 diff **有**削弱既有測試……斷言已失去約束力」 |
+
+它還多做了三件我沒要求的事，且都成立：
+
+1. **抓到第三個問題（一般）**：新增的 `?q=` 邏輯完全沒有測試，連「輸出應被轉義」都沒鎖。
+2. **抓到矛盾（建議）**：`App.vue:6` 的註解說「全程不插入任何原始 HTML」，與 `:31` 的 `v-html` 直接衝突——這是我埋缺陷時沒注意到的。
+3. **抓到包裝手法**：commit 訊息寫「整理斷言」，它直接指出是「以整理為名行弱化之實」。
+
+它也把不確定的事放進「疑問」而不是判成錯誤（commit 訊息沒說是否需要富文字），並給了可執行的修法（`{{ searchText }}` 文字插值；若真要富文字，必須先登記清理入口）。
+
+**本關沒有新缺陷。** 這是 A～O 以來第一次「零新增缺陷」——前 11 個都在前三關被抓出來，到這關開始變成在驗「修進去的規則有沒有用」。
+
+> 收尾：壞 commit 已 `reset --hard 938bc49` 還原，主線回到 7/7 綠。
+
