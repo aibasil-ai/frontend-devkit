@@ -324,3 +324,58 @@ review 是在 commit **之前**對工作目錄跑的（依 §9 不建審核 work
 
 > 收尾：壞 commit 已 `reset --hard 938bc49` 還原，主線回到 7/7 綠。
 
+## 關卡 6（app-b，無 `project.md`）— **降級流程正確，但抓到 P、Q、S、T、U 五條**
+
+app-b 是 app-a 的複本，刻意砍掉 `project.md`／`resolved.md`／`.opencode/opencode.json`，且**沒有 `node_modules`**（任何 build 都必然失敗，是很好的測謊點）。
+
+### 做對的部分
+
+| 檢查 | 結果 |
+|---|---|
+| 找不到 profile 時不派工 | ✅ 停下並給三個選項（`init` 建議／口述 gate／取消），符合主檔 §11 第 1 列 |
+| 口述 gate 模式：一次問完 test／lint／build | ✅ |
+| 說出此模式的限制 | ✅（內容有一處錯，見 P） |
+| worktree 一律 `ask` | ✅ 有問 |
+| 需求澄清（行為、位置） | ✅ 先問清楚才動手，沒有自行猜 |
+| 回報標「無設定檔模式」 | ✅ |
+| 有沒有假稱跑過 gate | ✅ **沒有**；明寫「測試未執行、gate＝無」 |
+| reviewer 的 PASS 是不是空殼 | ✅ 我抽驗它引用的 5 個位置（`style.css:87/:101`、`HelloWorld.vue:21`、`App.vue:16`、`HelloWorld.vue` 無 `<style>`、`section` 無可及名稱）**全部正確**——它讀的是檔案內容，`read` 沒被限制 |
+
+### 缺陷 P：把「標準 gate 可跑」說成「多半跑不起來」
+
+orchestrator 的降級說明寫：「reviewer 的 shell 預設是 deny，口述指令**多半跑不起來**」。但主檔 §11 原文是精確的「**三角色不同**：reviewer 對靜態清單內的指令（`npm test *`、`npx eslint *`…）**可執行**，清單外才需人工」。實測 `reviewer.md` 的 allow 清單有三十幾條標準 gate（`npm test`／`npm run lint|build|typecheck`／`npx vitest|jest|ava|eslint|tsc|prettier`／pnpm／yarn／bun 對應項）。
+
+後果：使用者會誤以為 reviewer 一律不能獨立驗證，於是**跳過可驗的步驟**。修法：`orchestrator.md` §5 把「哪些跑得了」列成具體例子，並明令不得籠統說「多半跑不起來」。
+
+### 缺陷 Q：`depStrategy` 推薦 `junction`，卻沒驗 `node_modules` 存在
+
+app-b **完全沒有 `node_modules`**，但問卷把 `junction` 標成「（建議）」。若照建議選，會死在 `Resolve-Path node_modules`（`-Target` 取不到），而且**死在工作tree 已建立之後**，得回頭清殘留。
+
+修法：`orchestrator.md` §5 與 `setup.md` §2 都先 `Test-Path node_modules`；不存在就**不得把 `junction` 當建議**（`init` 應改預設 `install-per-worktree`），主檔 §11 最後一列同步補上。
+
+### 缺陷 T：使用者選「不要 worktree」，仍問 `depStrategy`
+
+`depStrategy` 是 worktree-only 參數；選了不做 worktree 就不該問（問了只是噪音，還會讓人以為要建）。修法：`orchestrator.md` §5 明令「使用者選不要 worktree 時不得再問」。**（使用者確認本輪按的是「直接在主工作區」，所以沒有出現「選了 worktree 卻沒建」的嚴重情形。）**
+
+### 缺陷 S：被拒後沒有「拆單條重試」的處置 → reviewer 誤判自己沒有權限
+
+reviewer 第一次查證就用
+```
+git status --short; echo "---BRANCH---"; git rev-parse --abbrev-ref HEAD
+```
+被 `Permission denied: shell` 拒絕（scanner 拆句後 `echo` 不在白名單）。它的結論是「**reviewer 權限不含 shell**」——**事實錯誤**：`git status *`、`git diff *`、`git rev-parse *` 全部 allow，只要拆成一條一條就會過。
+
+後果連鎖：它放棄了整輪 git 查證 → **協調者代跑並說「那塊由我補上」**（見 U）→ 這一輪的「reviewer 獨立查證」實質上沒有發生，卻仍然出了 PASS。
+
+修法：`reviewer.md` §1 新增——被拒先**拆成單條重試**（去掉 `;`／`&&`／`|`／`echo`／`cd`），單條仍被拒才算權限不足；回報要引用被拒的**原始字串**；**不得**因一次複合指令被拒就宣稱「我沒有 shell 權限」。並補最具體反例（`echo` 當分隔標籤）。
+
+### 缺陷 U：協調者用「我補上」代替 reviewer 的獨立查證
+
+orchestrator 自己跑了 `git status`／`git diff --stat`，並寫「reviewer shell 被拒的那塊由我補上」，然後照樣接受 PASS。技術上那些是唯讀指令、結果也對，但**派 developer 的人驗自己的派工，不叫獨立驗證**；更糟的是它把 S 的根因（寫法錯）誤診成（權限不足）並用代跑結案，下一輪還是會發生。
+
+修法：`orchestrator.md` §6 新增——代跑結果只能標「協調者補充，非 reviewer 獨立查證」，且**不得**用它讓「reviewer 未獨立查證」變成通過；遇到「權限不含 shell」要先判斷是不是串接寫法造成。
+
+### 尚未驗的一項
+
+關卡 6 第 4 步「拿掉 `.opencode/opencode.json` 的 `agents` 節點後，非白名單指令仍被拒」需要 app-b 先跑過 `init`（才會產生該檔），本輪未做。
+

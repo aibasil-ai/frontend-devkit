@@ -175,13 +175,15 @@ permissions:
 用 `question` **一次問完**最小集合：test／lint／build 各自的指令，或答「無」。此模式：
 
 - 不套用任何 pack、不自己讀 `package.json` 猜（那是 `setup` 的職責，而你只能派 developer／reviewer）。
-- reviewer 的 shell 是 deny 起頭：**口述指令若不在主體靜態清單內，reviewer 跑不了**，該輪回報必須寫「gate 由 developer 單方執行，reviewer 未獨立重跑」。developer 是 ask 起頭，會逐次彈窗。
-- worktree 決策一律按 `ask`；`depStrategy` 只能取 `junction` 或 `none` 由使用者選（`install-per-worktree` 需要 profile 裡的安裝指令，不可默認）。
+- reviewer 的 shell 是 deny 起頭，但**主體靜態清單已 allow 標準 gate**：`npm test`／`npm run test|lint|build|typecheck`／`npx vitest|jest|ava|eslint|tsc|prettier`／`pnpm test`／`pnpm run test|lint|build`／`yarn test|lint|build`／`bun test`（第 6 站關卡 6 實測）。所以：**標準 gate 口述後 reviewer 是跑得起來的**，應要求它獨立重跑；只有**自訂指令**（例 `pnpm check`、`make test`）不在清單內，那種情況才寫「gate 由 developer 單方執行，reviewer 未獨立重跑」。**不得**籠統說「reviewer 多半跑不起來」——那會讓你錯誤地跳過可獨立驗證的步驟。
+- worktree 決策一律按 `ask`；**使用者選「不要 worktree」時，不得再問 `depStrategy`**（那是 worktree-only 的參數，問了只是噪音）。
+- 使用者選 worktree 時：`depStrategy` 只能取 `junction` 或 `none`（`install-per-worktree` 需要 profile 的安裝指令，不可默認）。**推薦前先 `Test-Path node_modules`**：主工作區沒有 `node_modules`（全新 clone、還沒安裝依賴）→ **不得把 `junction` 標成「建議」**（它的 `-Target` 取不到，必然失敗），只能提供 `none` 並說明原因。
 - 明說：此模式**不建議用於要 commit 的任務**。
 
 ## 6. PASS 之後
 
 1. **整理摘要**：在工作目錄跑 `git status` 與 `git diff --stat`，連同 developer 摘要呈報。**必須包含**：reviewer 最終輪的回歸檢驗（動態基準數字、影響範圍結論）、**建議手動回歸檢查逐項清單**、以及「因 `TBD` 未覆蓋的檢查」清單。
+   - **不得用「我補上」代替 reviewer 的獨立查證（第 6 站關卡 6 缺陷 U）**：reviewer 若回報「我的權限不含 shell」，先判斷是不是它**串接指令**（`;`／`&&`／`|`／`echo` 分隔標籤）被 scaner 拆句拒絕——那通常拆成單條重試就能過。你代跑的結果只能標「**協調者補充，非 reviewer 獨立查證**」，且**不得**用它讓「reviewer 未獨立查證」這一項變成通過。
 2. **擬繁體中文 commit 訊息**（說明改了什麼與為什麼），把**完整訊息文字**放進 `question` 內容給使用者審：「同意 commit」／「修改訊息」／「先不要 commit」。選修改就重擬再問。
 3. **同意後才 commit**：`git add <具體檔案>` 逐一加入 developer 異動且你確認過的檔案，**不要 `git add -A` 或 `git add .`**；再 `git commit -m "<繁中訊息>"`（ask 權限會再確認一次）；以 `git log -1 --stat` 覆核。
 4. 有 worktree 再問：「合併並清除」／「保留」／「直接丟棄」。

@@ -65,6 +65,8 @@ permissions:
 
 1. 依主檔 §5.1／§5.1.1 的對應表偵測：lockfile 與包管理器、`scripts.test`／`lint`／`build`、測試框架與測試檔位置、基準分支、eslint 設定、語系目錄、框架指標、`.env*` 檔名、既有危險模式字串搜尋（只當候選，仍需你確認）。每項標來源，例：`(偵測自 package.json scripts.test)`。
 2. 偵測不到或語意不確定的欄位（熱點清單、安全入口與不得放寬項、豁免、worktreePolicy、depStrategy、model、`## 額外 shell`）→ 用 `question` **一次一題**問你。
+   - **`depStrategy` 的可行性先驗（第 6 站關卡 6 缺陷 Q）**：`junction` 需要主工作區有 `node_modules`。`Test-Path node_modules` 為假 → **預設改用 `install-per-worktree`**（或在你選 `none` 時保留 `none`），並在回報說明「本專案尚無 `node_modules`，junction 不可用」；**不得**把 `junction` 當建議值，否則第一次建 worktree 就會在 `Resolve-Path node_modules` 失敗。
+   - 使用者選 `worktreePolicy: never`／`none` 時，`depStrategy` 仍要寫入合法值（供日後切換），但**不要在流程中問「依賴要用哪種方式」**——那是 worktree-only 的問題。
 3. 寫入前對 profile 的**四個白名單欄位**做值檢查（主檔 §5.1.2）：`設定檔路徑`、`kitRoot`、`worktree 目錄`、`環境檔`。任一非法 → **拒絕寫入並停止**，說明為什麼要擋（例：`設定檔路徑` 指向全域＝借我的手改到全域設定；`worktree 目錄` 含 `..`＝工作區與環境檔會落到專案外）。
    同時驗**格式欄的值域**：`worktreePolicy` ∈ ｛`ask`、`always`、`never`｝、`depStrategy` ∈ ｛`junction`、`install-per-worktree`、`none`｝、`shell` ∈ ｛`powershell`、`TBD（未確認）`｝，而 **`預設審核範圍` 只能是 `/frontend-devkit/review` 認得的範圍語法**（`a..b`、單一 sha、`origin/<分支>`、`--working`）。**禁止把保留詞當成值**：`省略`、`預設`、`default`、`無`、空字串都不行（第 6 站缺陷 B：app-a 曾被寫成「省略」，而那正是指令檔明令不准傳的詞）。拿不到範圍時（例如 repo 沒有 `origin` 遠端）一律寫 **`TBD（未確認）`** 並在該列寫出後果：不帶範圍的 `/frontend-devkit/review` 會被要求補範圍。
 4. 依 §3 做 gate 可行性判定（不寫 shell 規則）。

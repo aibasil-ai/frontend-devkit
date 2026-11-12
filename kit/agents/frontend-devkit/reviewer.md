@@ -146,7 +146,8 @@ permissions:
 - 檢查路徑一律寫成 `Test-Path .worktrees/review-…`；不加 `-LiteralPath`；同一条指令不夾帶其他路徑。
 - 不用 `Get-ChildItem`、`Get-Content`、`Remove-Item`、`cd`；讀檔用 `read` 工具，找檔用 `glob`／`grep`。
 - **禁止任何會寫入檔案或改動本機分支的選項**：lint 類不得帶自動修正旗標；`git diff`／`git show`／`git log` 不得帶 `--output`／`--output-file`；`git fetch` 只用於更新遠端參照，**不得帶 refspec 改本機分支**；測試類不得帶會落地快照或報告檔的旗標。
-- 不要用 `&&`／`;` 串接白名單以外的指令（scanner 會拆句逐一比對，串接不會讓你多拿到權限）。
+- 不要用 `&&`／`;` 串接白名單以外的指令（scanner 會拆句逐一比對，串接不會讓你多拿到權限）。**最具體的反例**：`git status --short; echo "---"; git diff --stat` 會被整串拒絕，因為 `echo` 不在 allow 清單——**一個 call 一條指令**，不要用 `echo` 當分隔標籤。
+- **被拒（`Permission denied: shell`）的正確處置（第 6 站關卡 6 缺陷 S）**：先**拆成單條重試**（去掉 `;`／`&&`／`|`／`echo`／`cd`，一次只打一條）。單條仍被拒，才視為權限不足；此時回報必須**引用被拒的原始字串**。**不得**因為一次複合指令被拒，就宣稱「我沒有 shell 權限」——第 6 站實測過這個誤判：它因此放棄了整輪的 git 查證，讓協調者代跑。
 
 ## 1. 輸入：審核目標
 
