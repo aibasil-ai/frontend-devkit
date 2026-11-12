@@ -90,14 +90,14 @@
 | G4 | probe 執行者不成立（init／inspect 是 setup，而 setup `subagent deny` 派不到 reviewer），且記錄位置檔頭／檔尾互相矛盾、重譯會抹掉 | D17：setup 的 `subagent` 改為「deny，唯一例外 allow `frontend-devkit/reviewer`」；probe 結果寫進 `project.md` 的 `## 安裝紀錄`，`resolved.md` 檔頭只留引用行（§8.2 重寫） | 已修 |
 | G5 | probe 第 1 條可用 `git rev-parse`（主體本就 allow）→ 零判別力；關卡 1 在尚未 init 時就跑 probe | §8.2 第 1 點定為「必須用只來自專案端 jsonc 的 gate 指令」；關卡 1 只驗地板方向，次序判別移到關卡 2 | 已修 |
 | G6 | reviewer 白名單缺 `New-Item -ItemType Junction *`、`Resolve-Path *`、`npm ci *`、`git worktree remove --force .worktrees/review-*`、`git rev-parse／log／show／fetch／merge-base／ls-tree／cat-file／check-ignore`——程序檔折進 resolved 後，這些動作會全數被地板 deny 擋死 | §7.1 reviewer 列補齊整套（含 worktree 就緒組），並註明 `Get-FileHash` 不給 reviewer（歸 setup，見 S5） | 已修 |
-| G7 | §5.1.1 的 shell 探針 `Write-Output $PSVersionTable...` 不在 setup 白名單，init 連偵測都會被拒 | setup 白名單加 `Write-Output *`；讀档一律改用 `read` 工具而非 `Get-Content` | 已修 |
+| G7 | §5.1.1 的 shell 探針 `Write-Output $PSVersionTable...` 不在 setup 白名單，init 連偵測都會被拒 | setup 白名單加 `Write-Output *`；讀檔一律改用 `read` 工具而非 `Get-Content` | 已修；**但 R1 實測後該探針已被 `Get-Location` 取代（第 8 題），見 §17.11** |
 | G8 | 「profile 不存在→口述 gate 繼續」與「resolved.md 缺失→停止」必然同時觸發，互相矛盾 | §11 兩列互加豁免與例外（選口述路線時 resolved 鐵則一併豁免，但全程標「無設定檔模式」） | 已修 |
 | G9 | (a) resolved.md 被手改時偵測不到（保留原 checksum 即混過）；(b) `## 專案覆寫` 可把 `security/*` 檢查合法歸零 | (a) D21：`inspect` 以源頭素材重建暫存 resolved 逐行 diff；(b) D18：安全檢查項只能覆寫更嚴，不得取消——reviewer 照樣執行、引用原文並列「嚴重」（§3 優先序第 3 點、§11、§10.4 同步） | 已修 |
 | G10 | 範本缺 `## 額外 shell`，而該欄的人填條目沒宣告要過寫入性檢查 → I-2 的旁路（有人可以填 `npm install *`） | 範本補該小節；permission-spec.md §7.3.5 開頭改成「**任何**要寫進專案端的 shell allow（不分偵測或人填）一律走第 1–4 步」 | 已修 |
 | G11 | orchestrator「依賴寫入一律 deny」與 §9.3 需要 `pnpm install --frozen-lockfile`、permission-spec.md §7.3.5#2 已把 frozen-lockfile 排除在疑似可寫入之外，三處態度相反 | D20：不可變／可變分界寫進 §7.1 與 permission-spec.md §7.3.4 第 6 點；orchestrator 列明確 allow `npm ci *` 等三條 | 已修 |
 | G12 | 「方案 A／B」被引用三次卻從未定義，且交叉引用指向 permission-spec.md §7.3.5（正解在 permission-spec.md §7.3.4#5） | 新增 permission-spec.md §7.3.0 對照表定義方案 A／B（含取捨與何時改用）；三處引用改為 permission-spec.md §7.3.0／permission-spec.md §7.3.4 | 已修 |
 | G13 | permission-spec.md §7.3.4 承諾「由 acceptance.md §13 第 1 關實測路徑匹配」，但關卡 1 清單沒這條 | 關卡 1 通過條件補「四種路徑形＋`opencode.jsonc` 的編輯嘗試全數被拒」 | 已修 |
-| S1 | `normalize-forms.ps1` 的 `(' reviewer','reviewer')` 是刪空格規則，造成全文約 15 處漢字黏 reviewer；「人工逐行複核」當時並未完成（還殘留四類簡體字形：處、試、這、沒 的簡寫） | 移除該規則，改為「漢字與 agent 名稱之間補空格」的正規化（`([\p{IsCJKUnifiedIdeographs}])(reviewer|developer|orchestrator|setup)` → 補空白）；四類殘留逐條改掉。**註**：本欄原本用「錯字→正字」的對照寫法保留簡體形做留痕，第 6 站跑全檔批次替换時，這些對照被一起「更正」成「處→處」「條→條」的廢話——我先前寫在 `tools/README.md` 的紀律（批量替換後必須人工重讀受影響行）自己又沒做到，現已把對照改寫為不含簡體形的描述。**教訓升級**：文件內凡要保留「錯字樣本」，一律用**註音／描述**而非原字，否則任何字形清洗都會自我吞掉 |
+| S1 | `normalize-forms.ps1` 的 `(' reviewer','reviewer')` 是刪空格規則，造成全文約 15 處漢字黏 reviewer；「人工逐行複核」當時並未完成（還殘留四類簡體字形：處、試、這、沒 的簡寫） | 移除該規則，改為「漢字與 agent 名稱之間補空格」的正規化（`([\p{IsCJKUnifiedIdeographs}])(reviewer|developer|orchestrator|setup)` → 補空白）；四類殘留逐條改掉。**註**：本欄原本用「錯字→正字」的對照寫法保留簡體形做留痕，第 6 站跑全檔批次替換時，這些對照被一起「更正」成「處→處」「條→條」的廢話——我先前寫在 `tools/README.md` 的紀律（批量替換後必須人工重讀受影響行）自己又沒做到，現已把對照改寫為不含簡體形的描述。**教訓升級**：文件內凡要保留「錯字樣本」，一律用**註音／描述**而非原字，否則任何字形清洗都會自我吞掉 |
 | S2 | 「雨條」錯字、「明示范例」不成詞、「讓你_commit_ 得下」語句不順 | 全數改寫（§8.2、permission-spec.md §7.3.1 事實 4、§4.2.2） | 已修 |
 | S3 | 「四個偵測細節」實列 5 條；「以下八條」實列 9 條 | 計數改正（§5.1.1／§14／§9） | 已修 |
 | S4 | 範本六個表格全缺 `|---|` 分隔列（GFM 不渲染，會被逐字寫進專案）；「dev gate」是孤詞 | 分隔列補齊；孤詞改為「任一 gate 在專案裡不存在時」 | 已修 |
@@ -249,9 +249,30 @@
 | 2　migration-map 缺「回歸防護五步」遷移列 | **已修**：該檔補一列，寫明五步各自去處（步 1 動態量測、步 2 類別進 profile、步 3 進 pack、步 5 來源是 `## 回歸熱點`），並標明**五步本身留主體提示詞** |
 | 3　§17.8 落點引用錯（hook 告警） | **已修**：主檔 §14 步驟 9 現在列三條告警，第三條就是「任何 agent 都不准動 `.git/`（含 hooks）」，與 §11／D24 對齊 |
 | 4　`resolved.md` 檔頭缺「權限模式（A／B）」；§11 那整列仍是方案 A 語彙 | **已修**（上一站）：檔頭已補模式欄；§11 該列改寫成 B 的四道處置（compile 標疑似可寫入→不入可執行 gate；清單外→需人工執行；developer 彈窗預覽原始命令；`inspect` 列出持久 allow 要你手動撤） |
-| 5　R9／R10 仍用方案 A 語彙 | **已修**：R9 改「四道牆」，第二道换成「主體靜態清單＋清單外需人工執行」；R10 改寫為「B 下這是設計內結果」＋`Allow always` 持久化路徑＋`inspect` 審查存下的規則 |
+| 5　R9／R10 仍用方案 A 語彙 | **已修**：R9 改「四道牆」，第二道改成「主體靜態清單＋清單外需人工執行」；R10 改寫為「B 下這是設計內結果」＋`Allow always` 持久化路徑＋`inspect` 審查存下的規則 |
 | 6　方案 A 覆驗未做 | **仍未做**，如實保留。這是本份文件唯一還掛著的「可能推翻現行設計」的開放項：若覆驗證明專案端 config 的 allow 在正確綁定下生效，則 D19、permission-spec.md §7.3.4 第 1–6 點可復活、方案 A 可重新成為預設；若不生效，就該把那幾段整段刪除、只留一句「專案端不寫 shell 規則」 |
 
 **我對自己的兩條更正**（寫進來，不藏在對話裡）：
 1. 17.12 的原清單第 1、2、5 條曾引用檔中**已不存在**的字串（我拿舊字串當證據），實際早已修好。教訓：**列「未修清單」前要先 grep 現況**，否則清單本身就會變成下一輪要清的誤報。
 2. 拆檔用的腳本內建「引用加前綴」規則時，我沒先想到自己寫的「檔案地圖」表格會被自己的規則改成「原 permission-spec.md §7.3」這種自指涉——已人工修回。這正是 §14 步驟 3 新增「拆檔後必跑 `grep '§'` 比對檔案地圖」的理由。
+
+### 17.14 第 7 站：M1（步驟 3–6）落地，以及計畫檔的字元毀損
+
+**發現**：要寫 M1 時做字元健全性檢查，發現已 commit 的 `implementation-plan.md`（`f06aa45`）內有 **28 處「一」被誤寫為「次」**（例：「一個步驟一交」變「次個步驟次交」、「做一次跨檔 grep」變「做次次跨檔 grep」、「一致」變「次致」），另有多處簡體字形（这／没／数／过／写／审／换／档／经／设…）。更糟的是：我當時在對話裡對使用者敘述的措辭與檔內文字不一致——**這正是本計畫 §0.2／§0.5 要防的「宣稱與文件不一致」**，而它發生在寫下該紀律的同一份檔案裡。
+
+**處理**：重寫 `implementation-plan.md`（比逐點補丁安全），並把檢查制度化：每個 markdown 產出在 commit 前跑「一／次 數量比對」＋兩批簡體字形掃描＋「回覆敘述與檔內文字抽樣逐字比對」。本轮另修：CHANGELOG 兩處、writing-a-pack 一處、三個 pack 與 templates 的簡體字共 9 處（逐條手改，未再用批次腳本——因第 6 站的批次腳本正是毀損來源之一）。
+
+**M1 交付內容**：`kit/rules/`（4 個 pack ＋ registry）、`kit/worktree.procedures.md`（九條程序，佔位符化）、`kit/profile/project.template.md`（含四欄白名單的正／反例與三態說明）、`docs/writing-a-pack.md`（退件清單七條＋旗標界說＋§6.1 與 §6.4 衝突的裁決紀錄）。
+
+**M1 驗收實測結果**（先跑檢查、再回報，不先宣稱）：
+
+| 檢查 | 結果 |
+|---|---|
+| pack 內無完整指令列／timeout／項數／專案路徑（grep `npm \|pnpm \|npx \|timeout\|--fix\|99 項\|src/\|\.vue\|\.js`） | **0 命中** |
+| 四個 pack 檔頭 `id`／`status`（`已驗證`）／`covers` 齊備 | 4/4 通過 |
+| 模板表格分隔列：表頭數 10、`|---` 分隔列數 10 | 每表都有，無缺 |
+| kit 素材內無個人絕對路徑（grep `C:`、`Users\vipjo`） | **0**（原有一處是「非法範例」欄位的 `C:\…`，已改為 `<盤符>:\…` 以免與檢查互相干擾） |
+| 簡體字形兩批掃描（含 这没数过写审换档经设 等 40 餘字） | **0 命中** |
+| 「一」/「次」數量比對（9 個新檔） | 「次」全部來自合法詞（一次、每次、首次、上次、該次、前次、兩次、二次確認），無「一→次」毀損 |
+
+**尚未做、也不該瞞著的**：`kit/agents/` 與 `kit/commands/` 目錄此時是空的（git 不追蹤空目錄），所以主檔 §4.1 的目錄樹在 M2（步驟 7–8）之前無法用 `git ls-files` 驗「不缺不多」——這是**預期狀態而非通過**，到時才驗。
