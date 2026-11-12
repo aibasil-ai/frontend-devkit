@@ -53,3 +53,31 @@
 3. **接受「關卡 2～7 延後」**：先以關卡 0/1 的實測與 R1 八題實驗作為 M3 的部分通過，把 2～7 列為上線前必驗項，寫進 README 的上手檢查清單。
 
 （尚未開始：關卡 2～8；`kit/` 的全域安裝已清空，暫評專案 `app-a`／`app-b` 原樣留在 `%LOCALAPPDATA%\Temp\opencode\frontend-devkit-eval\`。）
+
+## 關卡 2（使用者在 app-a 的 TUI 手動跑 `init`）— 部分通過，抓出 4 個真缺陷
+
+使用者回報「init 完成」，並附一句 `OpenCode 版本（opencode --version 不在白名單，實測被拒）` 問是否正常。我查證實際產出（`project.md` 12.1KB、`resolved.md` 15.0KB、`## 安裝紀錄` 與檔頭皆有內容）後判定：
+
+### 通過的項目（逐項查證，非採信自稱）
+
+| 項目 | 證據 |
+|---|---|
+| 落點正確 | `## 安裝紀錄` probe 第 0 條＝app-a |
+| **lint 鉤子被抓** | `scripts.lint` 展開為 `node -e "console.log(1)"` → 標「任意執行族，不列入可執行 gate」，並經使用者答「無」定案。這是我最想驗的一項，行為正確 |
+| gate 判定與來源標註 | test＝`npm test`（展開 `vitest run`）可執行；build＝`npm run build` 可執行；依賴＝`npm ci` 不可變可執行；皆標 `偵測自 package.json …` |
+| probe 三條 | 第 1 條 `npm test` 真的跑過（vitest 5.1.0，1/1 通過）；第 2 條 `git commit --allow-empty -m probe` 被拒且 `git log` 仍只有我建的 2 個 commit（無殘留）；`.worktrees` 未產生、`git worktree list` 只剩主工作區 |
+| 檔頭欄位 | 權限模式 B、啟用清單、pack checksum（`security/vue-xss`＝DBEFB238、程序檔＝9E09C3AA）、covers、警告欄齊備 |
+| 誠實性 | 兩處取不到（OpenCode 版本、kit 版本）都寫「無法取得（原因）」，**沒有猜值** |
+
+### 抓出的缺陷與對應修法（已落地）
+
+| # | 缺陷 | 根因 | 修法 |
+|---|---|---|---|
+| A | **`.opencode/opencode.json` 沒建立**，`instructions` 未註冊；agent 還把「本檔目前尚未建立」寫進 profile 就回報完成 | 規格少了「init 完成定義」，沒要求收尾驗證必要寫檔動作 | `setup.md` §1#3 加「不論哪種情況都要寫 instructions」；§2 新增第 6 點**收尾自我檢查**（`project.md`／`resolved.md`／設定檔＋instructions 兩筆／安裝紀錄，缺一即回報「未完成」與原因）；主檔 §8.1 預設模式同步 |
+| B | **`預設審核範圍` 被寫成「省略」**——違反 §5.1.2 格式驗證，且「省略」正是指令檔明令不准傳的保留詞；app-a 無 `origin` 遠端，正確值應是 `TBD（未確認）` | 規格只說「必須是範圍語法之一」，沒列**非法保留詞**，也沒說偵測不到時怎麼寫 | 主檔 §5.1.2 新增「保留詞」段（`省略`／`預設`／`default`／`無`／空字串）；`project.template.md` 該列補非法值與後果；`setup.md` §1 第 3 點加值域驗證 |
+| C | 檔頭要求記 `OpenCode 版本`，但 `setup` 白名單沒有取用途徑 → 老實寫「無法取得」= **行為正確、規格有洞** | 規格未配對「需要記的資料」與「取得它的合法指令」 | `setup.md` 白名單加 `opencode --version`（精確形、純讀） |
+| D | `kit 版本` 在**專案區安裝**形態下必然取不到（kitRoot 不是獨立 git repo） | 規格假設 kit 一定來自獨立 repo | `setup.md` §4 與主檔 §6.3 明定：寫「無法取得（原因）」＋以 pack／程序檔 checksum 作次級源頭識別＋`inspect` 列為追蹤缺口，且不構成失敗 |
+
+### 修補後的同步
+
+`kit/` 的修補已重新複製進 `app-a` 與 `app-b` 的 `.opencode/`（驗證：兩邊 `setup.md` 皆含 `opencode --version` 與「收尾自我檢查」）。**舊的 `app-a/.opencode/frontend-devkit/project.md` 仍帶著缺陷 A／B 的值**（`設定檔路徑` 註「尚未建立」、`預設審核範圍` 為「省略」）→ 需重跑一次 `init` 讓新規則生效，這正是下一節關卡 2b 要驗的東西。

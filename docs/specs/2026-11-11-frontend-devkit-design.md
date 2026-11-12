@@ -334,7 +334,9 @@ frontend-devkit/
 | `worktree 目錄` | 專案內相對路徑；**不得**含 `..`、`~`、盤符（`C:`）、開頭 `/` 或 `\`；不得是 `.git` 或 `.opencode` 本身 | 填 `../x` → §9 程序折進 resolved 後，`git worktree add` 會在**專案外**建立工作區，並把可能含密鍵的 `.env` 複製到專案外（orchestrator 的 `git worktree add *` 本身不限前綴，所以只能靠這欄驗） |
 | `環境檔` | 單一檔名（可多檔、逐檔列）；**不得**含 `/`、`\`、`:`、`..`、萬用字元 | 含路徑或外部檔 → `Copy-Item <環境檔> .worktrees/…` 變成「從任意來源複製任意檔」，可被用來把機密檔搬進工作區再讀取 |
 
-另外四欄採**格式**驗證（非白名單）：`worktreePolicy` ∈｛`ask`,`always`,`never`｝、`depStrategy` ∈｛`junction`,`install-per-worktree`,`none`｝、`shell` ∈｛`powershell`,`TBD`｝；`預設審核範圍` 必須是 §8 認得的範圍語法之一。
+另外四欄採**格式**驗證（非白名單）：`worktreePolicy` ∈｛`ask`,`always`,`never`｝、`depStrategy` ∈｛`junction`,`install-per-worktree`,`none`｝、`shell` ∈｛`powershell`,`TBD`｝；`預設審核範圍` 必須是 §8 認得的範圍語法之一（`a..b`、單一 sha、`origin/<分支>`、`--working`）。
+
+> **保留詞（第 6 站缺陷 B 補）**：`預設審核範圍` 的值**不得**填「`省略`」「`預設`」「`default`」「`無`」「空字串」——這些是語意佔位詞、不是範圍。拿不到範圍時（例如 repo 沒有 `origin` 遠端）一律寫 **`TBD（未確認）`** 並在該列標明後果「不帶範圍的 `/frontend-devkit/review` 會被要求補範圍」（§5.1.1 第 5 條）。`setup` 寫入前要擋，`inspect` 每輪重驗。
 
 > **同一輪也補齊 permission-spec.md §7.3.5#2 的「寫入性」清單（原本只有 `--fix` 類旗標）**：`## 指令` 或 `## 額外 shell` 若填 `rm *`、`del`、`Remove-Item`、`Move-Item`、`Rename-Item`、`Set-Content`、`New-Item`（非 junction 用）、`icacls`、`Invoke-Expression`、`iex` 這類**檔案系統寫刪／任意程式執行**指令，一律視為可寫入而**拒絕 allow**；reviewer 節點的專案端 allow 另加一句限定：「僅測試／lint／build／唯讀工具類」。
 
@@ -369,7 +371,9 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 ### 6.3 `resolved.md`（編譯產物）
 
-由 `/frontend-devkit/init compile` 產生，內容為啟用 pack 的檢查項合併結果 **+ 參數化後的 worktree 程序段落**（D15），檔頭記錄：**權限模式（A／B；現行預設 B，permission-spec.md §7.3.0.1#4）**、profile 路徑、啟用清單、每個 pack 的 sha256 前 8 碼、產生時間、kit 版本（kit repo 的 `git rev-parse --short HEAD`）、OpenCode 版本、以及「上次 probe：日期／結果」的**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，見 §8.2 第 4 點——產物檔不存會被重譯抹掉的資料）。
+由 `/frontend-devkit/init compile` 產生，內容為啟用 pack 的檢查項合併結果 **+ 參數化後的 worktree 程序段落**（D15），檔頭記錄：**權限模式（A／B；現行預設 B，permission-spec.md §7.3.0.1#4）**、profile 路徑、啟用清單、每個 pack 的 sha256 前 8 碼、產生時間、kit 版本、OpenCode 版本（`opencode --version`）、以及「上次 probe：日期／結果」的**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，見 §8.2 第 4 點——產物檔不存會被重譯抹掉的資料）。
+
+> **兩個版本欄的取不到情況（第 6 站缺陷補）**：kit 以獨立 git repo 安裝時 kit 版本取 `git rev-parse --short HEAD`；**專案區安裝時 kitRoot 不是獨立 repo，必然取不到**。OpenCode 版本需 `setup` 白名單内的 `opencode --version`（第 6 站發現原本沒給這條合法途徑，造成 agent 只能老實寫「無法取得」）。兩者取不到時**如實寫「無法取得（原因）」**、不得猜值或省略該欄，並以 pack／程序檔 checksum 作源頭識別的次級依據；`inspect` 要把這些缺口列進回報。
 
 主體鐵則（**只用 `read` 就能執行，不要求 agent 會算雜湊**）：`resolved.md` 不存在，或其檔頭的「啟用清單」與 `project.md` 的 `## 啟用規則` 不一致 → **停止並提示重跑 compile**，不得靜默使用舊產物。
 
@@ -452,7 +456,7 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 | 模式 | 行為 |
 |---|---|
-| 預設（無參數） | 偵測 → 填可決定的欄位 → 對掃不到的（熱點表、安全入口、豁免、worktreePolicy、depStrategy、額外 shell、model）用 `question` 問（一次一題）→ 依 permission-spec.md §7.3.5 逐條批准 allow → 寫 `project.md` → compile → `inspect [probe]` → 印出「寫入內容、TBD 彙整、下一步指令」 |
+| 預設（無參數） | 偵測 → 填可決定的欄位 → 對掃不到的（熱點表、安全入口、豁免、worktreePolicy、depStrategy、額外 shell、model）用 `question` 問（一次一題）→ 依 permission-spec.md §7.3.5 逐條批准 → 寫 `project.md` → compile → `inspect [probe]` → **收尾自我檢查**（`project.md`／`resolved.md`／`<設定檔路徑>`＋`instructions` 兩筆／`## 安裝紀錄` 四項全齊，缺一即回報「未完成」與原因，見 `kit/agents/frontend-devkit/setup.md` §2.6）→ 印出「寫入內容、TBD 彙整、下一步指令」 |
 | `auto` | 只做偵測與寫檔，不問問題；掃不到寫 `TBD`；allow 只收「展開後不含寫入性選項」的指令（permission-spec.md §7.3.5 第 3 條），其餘留 TBD；結束逐條列出「每個 TBD 與每條未 allow 的指令會讓哪項檢查失效」。適合快速開跑 |
 | `compile` | 只重譯 `resolved.md`：驗 id 存在與 status、算 pack checksum（`Get-FileHash`）、把 worktree 程序參數化折入、比對啟用清單 |
 | `diff` | 不寫檔，只印「重跑偵測後會改變哪些欄位、你手寫的內容是否受影響」（取代原本的 `recheck`，簡化自 CHANGELOG.md 附錄 B §17 S-4） |

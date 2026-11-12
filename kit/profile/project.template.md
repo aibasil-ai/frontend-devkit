@@ -28,7 +28,7 @@
 | 分支前綴 | TBD（未確認） | 你答 | 缺值時用 kit 預設 `feature/`、`fix/`（並記錄是預設而非你指定） |
 | worktree 名稱前綴 | TBD（未確認） | 你答 | 缺值時用 kit 預設 `review-` 與 `<類型>-<slug>` |
 | 預設基準分支 | TBD（未確認） | 偵測 | 省略範圍的審核無法定義；`/frontend-devkit/review` 不帶範圍會被要求補 |
-| 預設審核範圍 | TBD（未確認） | 偵測 | 同上 |
+| 預設審核範圍 | TBD（未確認） | 偵測 | **不得填保留詞**（`省略`／`預設`／`default`／`無`／空字串）；值只能是 `a..b`、單一 sha、`origin/<分支>`、`--working`。拿不到（例如無 `origin` 遠端）就寫 `TBD（未確認）`，並理解其後果：不帶範圍的 `/frontend-devkit/review` 會被要求補範圍 |
 | 環境檔 | TBD（未確認） | 偵測 | worktree 內跑測試／build 可能因缺設定失敗；非法值有外洩風險 |
 
 ### 四欄白名單（`setup` 寫入前驗、`inspect` 每輪重驗，非法即停止）
