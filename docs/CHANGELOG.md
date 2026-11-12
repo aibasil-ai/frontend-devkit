@@ -258,7 +258,7 @@
 
 ### 17.14 第 7 站：M1（步驟 3–6）落地，以及計畫檔的字元毀損
 
-**發現**：要寫 M1 時做字元健全性檢查，發現已 commit 的 `implementation-plan.md`（`f06aa45`）內有 **28 處「一」被誤寫為「次」**（例：「一個步驟一交」變「次個步驟次交」、「做一次跨檔 grep」變「做次次跨檔 grep」、「一致」變「次致」），另有多處簡體字形（这／没／数／过／写／审／换／档／经／设…）。更糟的是：我當時在對話裡對使用者敘述的措辭與檔內文字不一致——**這正是本計畫 §0.2／§0.5 要防的「宣稱與文件不一致」**，而它發生在寫下該紀律的同一份檔案裡。
+**發現**：要寫 M1 時做字元健全性檢查，發現已 commit 的 `implementation-plan.md`（`f06aa45`）內有 **28 處「一」被誤寫為「次」**（例：「一個步驟一交」變「次個步驟次交」、「做一次跨檔 grep」變「做次次跨檔 grep」、「一致」變「次致」），另有多處簡體字形（「這、沒、數、過、寫、審、換、檔、經、設」等十餘種）。更糟的是：我當時在對話裡對使用者敘述的措辭與檔內文字不一致——**這正是本計畫 §0.2／§0.5 要防的「宣稱與文件不一致」**，而它發生在寫下該紀律的同一份檔案裡。
 
 **處理**：重寫 `implementation-plan.md`（比逐點補丁安全），並把檢查制度化：每個 markdown 產出在 commit 前跑「一／次 數量比對」＋兩批簡體字形掃描＋「回覆敘述與檔內文字抽樣逐字比對」。本轮另修：CHANGELOG 兩處、writing-a-pack 一處、三個 pack 與 templates 的簡體字共 9 處（逐條手改，未再用批次腳本——因第 6 站的批次腳本正是毀損來源之一）。
 
@@ -272,7 +272,47 @@
 | 四個 pack 檔頭 `id`／`status`（`已驗證`）／`covers` 齊備 | 4/4 通過 |
 | 模板表格分隔列：表頭數 10、`|---` 分隔列數 10 | 每表都有，無缺 |
 | kit 素材內無個人絕對路徑（grep `C:`、`Users\vipjo`） | **0**（原有一處是「非法範例」欄位的 `C:\…`，已改為 `<盤符>:\…` 以免與檢查互相干擾） |
-| 簡體字形兩批掃描（含 这没数过写审换档经设 等 40 餘字） | **0 命中** |
+| 簡體專屬字形掃描（`tools/scan-forms.ps1` 的字集約 50 字，皆為繁體不用的簡體形） | **0 命中** ✓ |
 | 「一」/「次」數量比對（9 個新檔） | 「次」全部來自合法詞（一次、每次、首次、上次、該次、前次、兩次、二次確認），無「一→次」毀損 |
 
 **尚未做、也不該瞞著的**：`kit/agents/` 與 `kit/commands/` 目錄此時是空的（git 不追蹤空目錄），所以主檔 §4.1 的目錄樹在 M2（步驟 7–8）之前無法用 `git ls-files` 驗「不缺不多」——這是**預期狀態而非通過**，到時才驗。
+
+### 17.15 第 5 站（M2）：四個 agent 與六個指令落地，以及一次口誤的自我更正
+
+**產出**：
+
+| 檔案 | 內容 | 規則數 |
+|---|---|---|
+| `kit/agents/frontend-devkit/orchestrator.md` | 協調者：`ask` 起頭＋唯讀 git 與 worktree 具名 allow＋尾巴三段式（含第 3 段不可變例外）；`edit deny *`；只准派 developer／reviewer | 95 |
+| `kit/agents/frontend-devkit/developer.md` | 開發者：`allow *` 後接四條 edit deny（`*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、`*.git/*`）；尾巴第 3 段刻意為空（連 `npm ci` 都 deny）；七個回報區段、回歸防護五步、換行字元紀律 | 114 |
+| `kit/agents/frontend-devkit/reviewer.md` | 審核者：`shell` 與 `edit` 雙地板；具名到 `review-*` 的 worktree 就緒通道；靜態 gate 清單；§0 寫明「白名單只放行唯讀用法」背後的真實機制（whole-value wildcard，逐字寫是提示詞紀律而非權限保證）；七區段輸出 | 122 |
+| `kit/agents/frontend-devkit/setup.md` | 設定者：`edit` 僅四個具名檔與四種設定檔字面形，明確 deny 全域設定與 `*.git/*`；`subagent` 唯一例外是 reviewer（供 probe）；寫明「方案 B 下不得把 shell 規則寫進專案端」 | 30 |
+| `kit/commands/frontend-devkit/*.md` | 六個指令：dev／fix／review（含 `subagent: false`）／review-fix／init／inspect。皆無 shell 塊、無「專案端追加 allow」語彙 | — |
+
+**驗收**（`tools/check-structure.ps1` 實跑結果）：frontmatter 規則格式不符 0、雙斜線註解 0；主體混入專案專屬事實的 7 個樣本字全為 0；指令檔「專案端追加」殘留 0、shell 塊 0；三段式相對次序——orchestrator 與 reviewer 為「正確：allow 在 deny 之後」，developer 與 setup 為「無此對（N/A）」（developer 刻意沒有第 3 段，setup 不跑 gate）；字形掃描 0 命中、「一／次」數量正常。
+
+**自我更正（要記，不可當成裝飾文字）**：我一度在對話中宣稱「檢查在 `developer.md` 抓到 allow 排在 deny 之前」，查證後發現**該檔根本沒有那行**（developer 依規格第 3 段為空），是我把工具輸出解讀錯了。這是本計畫 §0.2／§0.5 要防的同一類錯誤（宣稱先於查證），而且這次發生在**對你回報的當下**。定案紀律：凡「檢查抓到 X」的敘述，必須先把工具輸出原帖貼上，再下結論。
+
+**M2 尚未做的兩件事**（不算通過）：
+
+1. **實際載入測試**：「四個 agent 能被 OpenCode 辨識、且不會冒出 `rules/...` 之類假 agent」需要先在 `~/.config/opencode/agents/frontend-devkit/` 裝一次再查清單。這會碰你的全域設定目錄（跑 R1 時我也是這麼做、事後清掉），因此**等你同意時點**。
+2. 目前 frontmatter 只經我寫的腳本做**格式**檢查，不是 YAML 解析器驗證；真正的載入錯誤要等上面第 1 項才會浮現。
+
+### 17.16 第 5 站追加：全域載入測試與 reviewer 權限煙霧測試（已清理）
+
+**做法**：把 `kit/agents/frontend-devkit/*` 複製到 `~/.config/opencode/agents/frontend-devkit/`，把 `rules/`、`profile/`、`worktree.procedures.md` 複製到 `~/.config/opencode/frontend-devkit/`（**沒有改動全域 `opencode.json`**），用 `opencode run --agent …` 實測，結束後兩個子資料夾都已刪除（`Test-Path` 皆 `False`，全域 agents 目錄只剩原本的 `security-auditor.md`，`opencode.json` 無 `agents` 鍵）。
+
+| # | 實測項目 | 結果 |
+|---|---|---|
+| 1 | 四個 agent 可否被載入（orchestrator／reviewer／setup／developer） | **全部成功**（`mode: subagent` 的 developer 也能被 `--agent` 直接啟動，代表 CLI 不強制 subagent 只能被派工） |
+| 2 | 負向：`--agent frontend-devkit/rules/vue-xss` | **Agent not found** ✓ → 印證 §4.2 的「發現規則陷阱」修法有效：rules 放 `agents/` 外不會被當成 agent |
+| 3 | reviewer 跑 `git status --short`（白名單內） | **EXECUTED** ✓ |
+| 4 | reviewer 跑 `git stash list`、`git tag`（尾巴第 1 段 deny，**無參數形**） | 兩者 **DENIED** ✓ → 同時印證「` *` 也匹配無參數形式」這條官方事實是真的，且 deny 排在 allow 之後確實壓得住 |
+| 5 | reviewer 跑 `cmd /c rmdir .worktrees\review-zzz`（allow 寫斜線形、實際打反斜線） | **EXECUTED** ✓ → shell 反斜線正規化在真實 kit agent 上同樣成立（不必並列兩形） |
+| 6 | reviewer 跑 `Test-Path .worktrees/review-zzz` | **EXECUTED** ✓ |
+| 7 | reviewer 跑 `npm testxyz` | **DENIED** ✓ → `"npm test *"` 不會誤放 `npm testxyz`，§7.3.2 的「用 ` *` 形、不用 `test*`」有實質效果 |
+| 8 | reviewer 跑 `Get-FileHash tools/scan-forms.ps1` | **DENIED** ✓ → 第 3 輪 S5 的修法落地：checksum 驗算只屬 `setup`／`compile`，reviewer 沒拿到該權限 |
+
+**副作用查核**：第 5、6 條的 `rmdir`／`Test-Path` 目標都是不存在的名字（`review-zzz`），不會刪到東西；`git status` 為唯讀。被 service 綁定的那個真實專案（`TOS_Frontend`）的 `.worktrees\feature-font-size-toggle`（2026/11/6）與兩個未 commit 檔案（mtime 2026/11/4）**保持原狀**，未受本次測試影響。
+
+**仍然未驗的**：六個指令檔的**斜線指令展開**（`/frontend-devkit/dev` 這類）需要在 TUI 或互動式 session 裡按出來看清單，headless 只驗證了 agent 端；另外 `init`／`compile`／`inspect` 的實際行為要等關卡 2（需要一個裝好 kit 的試寫專案）才算數。這兩項都留給 `acceptance.md` 的關卡處理，不在這裡宣稱通過。
