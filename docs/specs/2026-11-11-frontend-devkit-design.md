@@ -177,6 +177,8 @@ frontend-devkit/
 2. rules／程序檔的所在目錄由 profile 的 `kitRoot` 欄位記錄：全域裝法記 `~/.config/opencode/frontend-devkit`（用 `~` 寫法，不記錄 `C:\Users\...` 這種個人絕對路徑）；專案裝法記 `.opencode/frontend-devkit`。
 3. **`kitRoot` 只有 `setup`（init／compile／inspect）會讀**。開發迴圈的三個 agent **不得**去 `kitRoot` 讀任何東西：官方文件雖寫明 `external_directory` 預設 allow，但那是「使用者沒改全域政策」時的狀態，不能當保證。因此 **`worktree.procedures.md` 是源頭素材，經 compile 參數化後折進 `resolved.md` 的「worktree 程序」段落**，成為執行期唯一依據（見 §9）。
 4. 升級 = kit repo `git pull` → 覆蓋安裝位置 → 各專案 `/frontend-devkit/init compile`（重讀 pack 與程序檔、重譯 `resolved.md`）。
+5. **安裝／同步一律「先刪目標子目錄、再整包複製」**（第 6 站缺陷 H）：PowerShell 的 `Copy-Item <來源目錄> <已存在的同名目錄> -Recurse` 會把來源放**進**目標，產生 `rules/rules/`、`profile/profile/`。巢狀副本是舊版，一旦被誤當源頭折入，checksum 反而「對得上」，比對機制形同失效。`inspect` 已加此檢查；文件與腳本都不得再用「複製目錄到既有目錄」的寫法。
+
 
 ### 4.2.2 單一執行期依據（D15）
 
