@@ -99,7 +99,9 @@ permissions:
 
 ## 4. `compile`：產生 `resolved.md`
 
-1. 讀 `project.md` 的 `## 啟用規則`；對照 `kitRoot/rules/registry.md` 驗證每個 id 存在，並讀各 pack 的 `status`。id 不存在 → 報錯並列可用 id，**不產出** `resolved.md`。
+1. 讀 `project.md` 的 `## 啟用規則`；對照 `kitRoot/rules/registry.md` 驗證每個 id 存在，並讀各 pack 的 `status`。
+   - **0 列（整節只有表頭）＝合法狀態，不是錯誤**（第 6 站缺陷 G）：照樣產出 `resolved.md`，啟用清單／checksum／covers 都寫 `（無）`，警告欄寫「本次沒有任何 pack，只剩主體檢查」，並依 D18 要求流程啟動前二次確認。**不得**因「沒有 pack 可展開」拒絕產出。
+   - **空 id／壞列**（有資料列但 id 是空白，例如 `| `` | 已驗證 | … |`）＝**錯誤**：報錯並列 `registry.md` 可用 id，**不產出** `resolved.md`，且錯誤訊息**必須附恢復指令**「把該列 id 補成合法值，或整列刪除（代表零個 pack）」。第 6 站 app-a 實測到的就是這一種：agent 判對、拒絕猜測是正確的，但我的規格當時沒說「零列合法」，導致它無從建議「整列刪除」這條路。
 2. 用 `Get-FileHash` 算每個 pack 的 sha256 前 8 碼；記 `covers`。
 3. **兩個 pack 的 `covers` 主題重疊** → 印警告並**繼續**（欄位級衝突無法機械偵測，請你在 `## 專案覆寫` 裁決）。
 4. 啟用項中**沒有任何 `security/*`** → 醒目警告，並要求在流程啟動前二次確認。
@@ -118,7 +120,7 @@ permissions:
 2. 四個白名單欄位的值合法性（§2 第 3 點的四種）；`## 已知豁免` 是否符合「檔案＋規則＋理由」三件套，並列數量。
 2b. **值域一致性（第 6 站缺陷 E 對策）**：比對 `project.md`／`profile/project.template.md` 中對 `預設審核範圍` 与其他格式欄的**允許值描述**是否與主檔 §5.1.2 一致——尤其檢查有沒有把保留詞（`省略`、`預設`、`default`、`無`、空字串）列進「合法值」。不一致即警告並提示重跑 `init`（實例不會自愈，必要時由你確認後就地修正該行）。
 3. 全文 TBD 彙整（不靠總表，掃欄位值）＋「因 TBD 而未覆蓋的檢查」清單。
-4. 啟用清單一致性：`project.md` 的 `## 啟用規則` vs `resolved.md` 檔頭；缺 `resolved.md` 或不一致 → 提示 `init compile`。
+4. 啟用清單一致性：`project.md` 的 `## 啟用規則` vs `resolved.md` 檔頭；缺 `resolved.md` 或不一致 → 提示 `init compile`。並明確區分三種狀態：**0 列**＝合法（提醒「只剩主體檢查」與 D18 二次確認）、**空 id／壞列**＝錯誤（給恢復指令：補合法 id 或整列刪除）、**含不存在 id**＝錯誤（列 registry 可用 id）。
 5. 源頭一致性：重算 pack 與程序檔的 hash，與 `resolved.md` 記錄比對；再以源頭素材**在上下文重建內文**，與現行 `resolved.md` 內文**逐行**比對（**排除檔頭動態欄**：產生時間、kit 版本、OpenCode 版本、probe 引用行）。誠實標明這是 LLM 逐行比對，不是機械 diff；有差異即警告「產物與源頭素材不一致，疑似被手改或忘記重譯」。
 6. 需要落盤差異報告時，**只能**寫 `.opencode/frontend-devkit/resolved.check.md`；建議你把這檔加進 `.gitignore`（由你改，我只給建議），並在 `## 安裝紀錄` 登記它存在。
 7. 四個 agent 的規則存在性（主體 `.md` 隨 agent 載入，規則在就代表地板生效）；並檢查是否同時存在全域與專案兩份主體（有 → 警告）。

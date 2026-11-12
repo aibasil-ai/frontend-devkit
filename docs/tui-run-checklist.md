@@ -48,9 +48,16 @@ kit 已把修補同步進 app-a／app-b（`setup.md` 現含 `opencode --version`
 | # | 動作 | 預期 |
 |---|---|---|
 | 1 | 把 `project.md` 的 `## 啟用規則` 中某條 id 改成不存在的（如 `stack/vue3-vite`） | compile **報錯並列 registry.md 可用 id**，不產出 resolved.md |
-| 2 | 還原後，刪掉 `- security/vue-xss` 這一行 | compile **醒目警告「無 security/\*」**；後續 dev／review 啟動前要二次確認 |
+| 2 | 還原後，**刪掉整個資料列** `\| \`security/vue-xss\` \| 已驗證 \| … \|`（不是只刪 id 欄！只刪 id 欄會留下「空 id 壞列」，那是**錯誤**路徑，不是 0 pack 路徑） | **0 個 pack 屬合法**：compile **照樣產出** `resolved.md`（啟用清單／checksum／covers 寫 `（無）`），並印**醒目警告「本次沒有任何 pack，只剩主體檢查」**；接著跑 `/frontend-devkit/dev` 應出現 **D18 二次確認**（orchestrator 用 `question` 問「僅執行主體基本安全項？」）；`/frontend-devkit/review --working` 則應**不開始審核**並輸出固定提示句 |
+| 2b（可選，驗錯誤路徑） | 只刪 id 欄、留下 `\| \| 已驗證 \| … \|` | compile **報錯並列可用 id**，且錯誤訊息要附**恢復指令**（補回合法 id，或整列刪除＝0 pack）；**不產出** `resolved.md`、`project.md` 不被改動 |
 | 3 | 手動改 `rules/security/vue-xss.md` 一個字，**不**跑 compile，直接 `/frontend-devkit/inspect` | 逐行比對／checksum 應指出「產物與源頭素材不一致，疑似被手改或忘記重譯」 |
 | 4 | 跑 `init compile` 還原 | 警告消失 |
+
+> **app-a 當前狀態（2026-11-12 13:37，實測）**：`## 啟用規則` 是「**空 id 壞列**」（`| `` | 已驗證 | … |`），不是 0 pack。要繼續關卡 3，先二選一：
+> - **走 0 pack 路徑**（建議，這才是 3(a) 原本要驗的）：把那一整列刪掉 → `/frontend-devkit/init compile`。
+> - **恢復正常**：把該列 id 補回 `security/vue-xss`（status 與理由照舊）→ `/frontend-devkit/init compile`。
+>
+> 選哪條都不需要改 `resolved.md`（它會被重譯覆蓋）。
 
 ## 關卡 4　dev 流程（app-a）
 

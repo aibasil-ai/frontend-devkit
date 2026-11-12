@@ -376,6 +376,8 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 由 `/frontend-devkit/init compile` 產生，內容為啟用 pack 的檢查項合併結果 **+ 參數化後的 worktree 程序段落**（D15），檔頭記錄：**權限模式（A／B；現行預設 B，permission-spec.md §7.3.0.1#4）**、profile 路徑、啟用清單、每個 pack 的 sha256 前 8 碼、產生時間、kit 版本、OpenCode 版本（`opencode --version`）、以及「上次 probe：日期／結果」的**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，見 §8.2 第 4 點——產物檔不存會被重譯抹掉的資料）。
 
 > **兩個版本欄的取不到情況（第 6 站缺陷補）**：kit 以獨立 git repo 安裝時 kit 版本取 `git rev-parse --short HEAD`；**專案區安裝時 kitRoot 不是獨立 repo，必然取不到**。OpenCode 版本需 `setup` 白名單内的 `opencode --version`（第 6 站發現原本沒給這條合法途徑，造成 agent 只能老實寫「無法取得」）。兩者取不到時**如實寫「無法取得（原因）」**、不得猜值或省略該欄，並以 pack／程序檔 checksum 作源頭識別的次級依據；`inspect` 要把這些缺口列進回報。
+>
+> **零個 pack 的產物（第 6 站缺陷 G 補）**：若 `## 啟用規則` 為 **0 列**，`resolved.md` **仍要產出**：啟用清單寫 `（無）`、checksum 與 covers 寫 `（無）`、警告欄寫「本次沒有任何 pack，只剩主體檢查」，並觸發 D18 的二次確認。**不得**因為「沒有 pack 可展開」就拒絕產出——那會讓沒有適用 pack 的專案永久無法 compile，D18 也永遠測不到。相對地，**空 id／壞列**（有列但 id 是空白）是錯誤，錯誤訊息要同時給恢復指令（補回合法 id，或整列刪除）。
 
 主體鐵則（**只用 `read` 就能執行，不要求 agent 會算雜湊**）：`resolved.md` 不存在，或其檔頭的「啟用清單」與 `project.md` 的 `## 啟用規則` 不一致 → **停止並提示重跑 compile**，不得靜默使用舊產物。
 
@@ -553,7 +555,8 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | 有人企圖編輯 `.git/*`（含 `hooks/`） | developer 的 `edit` deny `*.git/*` → 直接被權限擋掉（不是提示詞約束）。README 要加一句：kit 不允許任何 agent 動 `.git/`，hook 類需求請你自己在專案外處理 |
 | 專案端 allow **命中主體尾巴第 1、2 段 deny** | `setup` 寫入前比對即拒絕；已存在者由 `inspect` 檢出並要求移除（permission-spec.md §7.3.4 第 2、3 點）。這是 D13「次序無關」成立的前提，屬**嚴重**設定問題 |
 | `## 專案覆寫` 企圖取消／降級 `security/*` 檢查項 | reviewer **照樣執行該檢查**、引用該覆寫原文並列「嚴重」（§3 優先序第 3 點例外） |
-| 啟用了不存在的 pack id | init／compile 報錯並列 `registry.md` 可用 id；執行期才發現則停止回報 |
+| 啟用了不存在的 pack id | init／compile 報錯並列 `registry.md` 可用 id；執行期才發現則停止回報。**空 id／壞列**（例如空白 id、只剩 `\| \| 已驗證 \| … \|`）屬此類，錯誤訊息必須同時給**恢復指令**：「把該列 id 補成 registry 內的合法值，或整列刪除（代表零個 pack）」 |
+| **啟用規則為 0 個 pack**（整節只有表頭、無任何資料列） | **合法狀態，不是錯誤**（第 6 站缺陷 G 補）：`compile` 要**照樣產出** `resolved.md`，啟用清單寫 `（無）`、covers 與 checksum 欄寫 `（無）`，並印**醒目警告**「本次沒有任何 pack，只剩主體檢查（§3 第 0 點）」。因為 0 個 pack 必然「沒有 `security/*`」，所以同時**觸發 D18 的二次確認**（dev／fix／review-fix 用 `question`；`/review` 依 §3 第 3 點不開始審核並輸出固定句）。`inspect` 要把「0 pack」列為正常但需注意的狀態，不得當成未初始化 |
 | 兩個 pack 的主題重疊（`covers` 有交集） | compile **印警告並繼續**（不阻擋）：列出重疊主題，請你在 profile 的 `## 專案覆寫` 裁決。真正的欄位級衝突無法機械偵測（§6.2），最終把關是 `writing-a-pack.md` 的人工退件紀律與 reviewer 的「覆寫未附理由 → 一般」規則 |
 | profile 覆寫未附理由 | reviewer 列「一般」 |
 | gate 為 `無` | 跳過並在回報註明「依設定檔：本專案無該 gate」；**不適用、不擋 PASS**（§3 三態表） |
