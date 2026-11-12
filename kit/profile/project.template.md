@@ -45,7 +45,7 @@
 - `worktreePolicy` ∈ ｛`ask`、`always`、`never`｝
 - `depStrategy` ∈ ｛`junction`、`install-per-worktree`、`none`｝
 - `shell` ∈ ｛`powershell`、`TBD（未確認）｝`
-- `預設審核範圍` 必須是 `/frontend-devkit/review` 認得的語法之一：省略（用 `預設基準分支` 組出範圍）、`a..b`、單一 sha、`origin/<分支>`、`--working`
+- `預設審核範圍` 只能是 `/frontend-devkit/review` 認得的**實際範圍語法**：`a..b`、單一 sha、`origin/<分支>`、`--working`。「使用者呼叫時不帶範圍」是**呼叫情境、不是可存的值**，不得寫進本欄（值域的唯一權威定義在主檔 §5.1.2；本處只列允許值，兩處若不一致以主檔為準並視為缺陷）。
 
 ## 指令
 

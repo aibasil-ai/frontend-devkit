@@ -337,6 +337,8 @@ frontend-devkit/
 另外四欄採**格式**驗證（非白名單）：`worktreePolicy` ∈｛`ask`,`always`,`never`｝、`depStrategy` ∈｛`junction`,`install-per-worktree`,`none`｝、`shell` ∈｛`powershell`,`TBD`｝；`預設審核範圍` 必須是 §8 認得的範圍語法之一（`a..b`、單一 sha、`origin/<分支>`、`--working`）。
 
 > **保留詞（第 6 站缺陷 B 補）**：`預設審核範圍` 的值**不得**填「`省略`」「`預設`」「`default`」「`無`」「空字串」——這些是語意佔位詞、不是範圍。拿不到範圍時（例如 repo 沒有 `origin` 遠端）一律寫 **`TBD（未確認）`** 並在該列標明後果「不帶範圍的 `/frontend-devkit/review` 會被要求補範圍」（§5.1.1 第 5 條）。`setup` 寫入前要擋，`inspect` 每輪重驗。
+>
+> **值域只能有一處權威定義（第 6 站 2b 補，防止「改了規則、忘了規則的出處」）**：每個欄位的合法值域以本節（§5.1.2）為唯一權威來源；`project.template.md`、`kit/agents/*` 提示詞與實例化的 `project.md` 都只能**列允許值或引用本節**，**不得**另外列舉「含保留詞」的清單。本輪實測就發現範本把「省略（用預設基準分支組出範圍）」列成合法值，與同一檔案下方的保留詞段互相矛盾——agent 当初填「省略」正是照那行做的。新增的檢查：`inspect` 要比對「範本／實例中該欄的允許值描述」與本節是否一致，不一致即警告。
 
 > **同一輪也補齊 permission-spec.md §7.3.5#2 的「寫入性」清單（原本只有 `--fix` 類旗標）**：`## 指令` 或 `## 額外 shell` 若填 `rm *`、`del`、`Remove-Item`、`Move-Item`、`Rename-Item`、`Set-Content`、`New-Item`（非 junction 用）、`icacls`、`Invoke-Expression`、`iex` 這類**檔案系統寫刪／任意程式執行**指令，一律視為可寫入而**拒絕 allow**；reviewer 節點的專案端 allow 另加一句限定：「僅測試／lint／build／唯讀工具類」。
 

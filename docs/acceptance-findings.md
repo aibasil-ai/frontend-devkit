@@ -81,3 +81,28 @@
 ### 修補後的同步
 
 `kit/` 的修補已重新複製進 `app-a` 與 `app-b` 的 `.opencode/`（驗證：兩邊 `setup.md` 皆含 `opencode --version` 與「收尾自我檢查」）。**舊的 `app-a/.opencode/frontend-devkit/project.md` 仍帶著缺陷 A／B 的值**（`設定檔路徑` 註「尚未建立」、`預設審核範圍` 為「省略」）→ 需重跑一次 `init` 讓新規則生效，這正是下一節關卡 2b 要驗的東西。
+
+## 關卡 2b（修補後重跑 `init`）— 通過，並抓出我自己留下的範本矛盾
+
+使用者在 app-a 的 TUI 重跑 `/frontend-devkit/init`，我逐項查證實際產物（不採信回覆）：
+
+| 修補項 | 實測證據 | 判定 |
+|---|---|---|
+| A｜`instructions` 未註冊 | `.opencode/opencode.json` 已建立，內容只有 `instructions` 兩筆（`project.md`、`resolved.md`）；無 `permissions`／`shell` 字樣（方案 B 紀律未破）；根目錄沒有第二份設定檔 | 已修 ✓ |
+| A｜profile 內「尚未建立」 | `設定檔路徑` 改成「…→取預設值並**已建立**；`instructions` 已註冊…」 | 已修 ✓ |
+| B｜保留詞當值 | `預設審核範圍` 現值 `TBD（未確認）`，附「repo 無 `origin` 遠端」與後果，並標明舊值已修正 | 已修 ✓ |
+| C｜OpenCode 版本 | 檔頭 `opencode v2.2.7`；安裝紀錄寫「`opencode --version` 執行成功」 | 已修 ✓ |
+| D｜kit 版本取不到 | 「無法取得（kitRoot 非獨立 git repo）」＋以 `security/vue-xss`＝`DBEFB238`、程序檔＝`9E09C3AA` 作次級識別，本輪 `Get-FileHash` 實測一致 | 如規格 ✓ |
+| probe 三條 | 第 0 條落點＝`...\app-a`（不是別棵樹）；第 1 條 `npm test` 退出碼 0（vitest 1/1）；第 2 條 `git commit --allow-empty -m probe` 被拒且 `git log` 仍只有我建的 2 個 commit | ✓ |
+| compile | 檔頭「第 3 次重譯」、權限模式 B、警告欄「無」 | ✓ |
+
+**唯一無法從檔案查證的**：收尾自我檢查的「逐項列出」只出現在 agent 回覆，不在檔案 → 待回覆末段貼回才認定，不先宣稱通過。
+
+### 缺陷 E（這輪新增）：值域的權威定義與範本互相矛盾
+
+`app-a/.opencode/frontend-devkit/project.md` 第 44 行（實例自 `project.template.md`）寫：「`預設審核範圍` 必須是…語法之一：**省略（用 `預設基準分支` 組出範圍）**、`a..b`…」。而同一份檔案下面寫「不得填『省略』」。**我把缺陷 B 的成因留在範本裡**——agent 當初填「省略」正是照那行做的。修了值域驗證卻沒改枚舉的出處，屬 reviewer 歷輪點名的「改一處忘三處」。
+
+已落地修法：
+1. 範本該行改為**只列四種實際語法**，並明說「使用者呼叫時不帶範圍」是**呼叫情境、不是可存的值**。
+2. 主檔 §5.1.2 新增規條：**值域只能有一處權威定義**（§5.1.2 本節）；範本、agent 提示詞、實例 `project.md` 只能列允許值或引用本節，不得另立含保留詞的清單；`inspect` 要比對兩者是否一致，不一致即警告。
+3. 同步範本進 app-a／app-b，並**就地修正 app-a 的 `project.md`**（實例不會自愈）。查證：`kit` 範本、app-a 的 `project.md` 與兩份範本共四處，舊行「省略（用」命中皆為 0、新行存在；app-b 仍無 `project.md`（關卡 6 需要該狀態）。
