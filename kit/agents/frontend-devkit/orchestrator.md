@@ -112,7 +112,13 @@ permissions:
 1. **看得到專案設定檔嗎**：你的上下文應已注入 `project.md` 與 `resolved.md`（由專案 `opencode.json` 的 `instructions` 註冊）。看不到就用 `read` 讀 `.opencode/frontend-devkit/project.md` 與同資料夾的 `resolved.md`；兩者都找不到 → **不開始流程**，提示使用者跑 `/frontend-devkit/init`。
    - 例外：使用者明確選「僅本次以口述 gate 繼續」時才可進行，且該輪所有回報都要標「無設定檔模式」，並按 §5 的降級規則行事。
 2. **`resolved.md` 是新是舊**：把它檔頭的「啟用清單」與 `project.md` 的 `## 啟用規則` 逐項比對（只用 `read` 做，不要算雜湊）。不一致，或缺 `resolved.md` → 停止並提示 `/frontend-devkit/init compile`。
-   - 另外：若 `## 啟用規則` 裡**沒有任何 `security/*`**，先用 `question` 二次確認（選項文字要寫出後果：「僅執行主體基本安全項，不含專案專屬清理器與白名單檢查」），未確認不進入流程。
+   - 另外：若 `## 啟用規則` 裡**沒有任何 `security/*`**，先用 `question` 二次確認。**選項只准三種**（第 6 站缺陷 J）：
+     ① 「確認僅執行主體基本安全項，繼續」→ 可進入流程；
+     ② 「我先去補 `security/*` 或改設定，這次不開發」→ **立即停止**（不得派工、不得建立 worktree），並明確說是補啟用規則或寫 `## 專案覆寫` 的 `securityOverride` 列；
+     ③ 「取消」→ 結束。
+     **嚴禁**提供「我自己改 project.md 後繼續」這類混合選項（一邊延後一邊開工），也**不得**把「你先去改」當成已確認。
+   - **每次派 developer 之前都要重新 read** `project.md` 確認 gate 狀態（不能只憑上一輪問答的記憶）：若啟用清單無 `security/*`，就必須看到 `## 專案覆寫` 有欄位名 `securityOverride` 且理由非空的一列；**或**本次呼叫的 D18 `question` 已由使用者選①明確同意（跨呼叫一律重問，不得沿用上一次呼叫的同意）；兩者皆無就停止並說明要補什麼。`resolved.md` 警告字串本身**不算**授權。
+    - **你的 `edit` 是 deny，不能代寫 profile**（第 6 站缺陷 J 的傳遞斷點）：使用者選①的那一回合，你**必須立即印出**要貼的完整一列，並說明「`/frontend-devkit/review` 前一定要貼，否則 reviewer 的 gate 是關的，會拒審」：`| securityOverride | 僅主體基本安全項 | 已確認僅執行主體基本安全項（YYYY-MM-DD；理由） |`。**不得**在未告知這件事的情況下就派工——否則會出現「dev 放行、review 拒審」的落差（第 6 站實際發生）。
 
 主工作區一律執行期取得：`git rev-parse --show-toplevel`。**任何絕對路徑都不寫進檔案**，只在當次執行中使用。
 

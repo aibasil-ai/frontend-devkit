@@ -212,3 +212,38 @@
 3. `setup.md` §5：`inspect` 的狀態判定由三態改為**四態**（0 列／整節空白／空 id／不存在 id）。
 
 > 尚未驗的兩步（屬 3(a) 的行為面）：`/frontend-devkit/dev` 是否跳 D18 二次確認、`/frontend-devkit/review --working` 是否**不開始審核**並輸出固定句。等使用者跑完再記錄，不先宣稱通過。
+
+## 關卡 3(a) 行為面（使用者跑 dev 再 review）— reviewer 正確；dev 也正確，破口是「授權傳遞」
+
+> 標題與初判已更正：使用者貼回問卷後確認 **dev 有問 D18、使用者選「同意」**，「疑似繞過」不成立。真正的缺陷是 orchestrator 與 reviewer 的 gate 沒有共用狀態（見下）。
+
+使用者先跑 `/frontend-devkit/dev 加一個 hello 按鈕`（在專案目錄開發出功能），再跑 `/frontend-devkit/review --working`。查證：
+
+| 項目 | 實測 | 判定 |
+|---|---|---|
+| reviewer：不開始審核、不輸出 VERDICT | 回覆明說不跑 git 讀取／test／build、不建 worktree、不輸出 VERDICT | ✅ 符合 D18 的拒絕路徑 |
+| reviewer：正確區分「`resolved.md` 那句是 kit 的警告，不是你的授權」 | `project.md` 的明示字串 0 命中；唯一命中在 `resolved.md` L14 | ✅ 這是 §8 紀律生效的實例 |
+| reviewer：`## 專案覆寫` 仍是 `無/無/無` | 相符 | ✅ |
+| dev：工作區產出 | `M src/App.vue`（+39）、`?? src/composables/useHelloToggle.js`、`?? test/app-hello.test.js`、`?? .opencode/` | 功能確實做了；且有補測試與 aria 屬性 |
+| dev：設定檔未被動 | `project.md`／`resolved.md` mtime 皆停在 14:09（早於 dev 的 14:21／14:29） | ✅ |
+| dev：無 worktree 殘留 | `.worktrees` 不存在、`git worktree list` 只有主工作區 | ✅ 且問卷第二題確實問了「要在哪裡進行」，使用者選「直接在主工作區」 |
+| **dev：D18 未滿足卻仍進入開發** | 問卷確實問了 D18 且使用者選「同意，僅跑主體基本安全項」 | ✅ **不是繞過**（我上一輪的 A／B 推測兩者皆錯）；真缺陷在「授權無法傳遞給 reviewer」 |
+
+### J 的真正結論：dev 沒錯，破口在「授權的傳遞」
+
+使用者貼回的問卷有兩題：D18（選「同意，僅跑主體基本安全項」）＋ worktree（選「直接在主工作區進行」）。所以：
+
+- 不是（A）混合選項——它問的選項是「同意」本身；
+- 也不是（B）沒問——它問了，而且選項文字把後果（不含專案專屬清理器／白名單檢查）寫出來了；
+- 依當時的規格（orchestrator 以 `question` 取得明確同意即可進入流程），**它照規則做，且做對了**。
+
+真正的破口是我上一輪剛補的規則自己製造的：orchestrator 的 `edit` 是 **deny**（實測 frontmatter 第 5 行 `{ action: "edit", resource: "*", effect: "deny" }`），它**不能**寫 `project.md`。於是「問卷同意」只存在於對話裡，reviewer（`question: deny`、只認檔案）看不到 → **dev 放行、review 拒審，兩邊都照規則做卻互相矛盾**。而我新加的「派工前必須看到 `securityOverride` 列」會讓「你已同意」的情境**永遠卡死**——這是缺陷 E／F 的同型（規格自我矛盾）。
+
+已改寫為一致的設計（三處同步）：
+
+1. 派工 gate 改為「**滿足任一**即可」：(a) `## 專案覆寫` 有 `securityOverride` 列且理由非空；或 (b) **本次呼叫**的 D18 `question` 已選①同意。**跨呼叫一律重問**，不得沿用上一次的同意。
+2. orchestrator 選①的那一回合**必須立即印出**要貼的那一列，並明說「`/review` 前要貼，否則 reviewer 會拒審」——因為它自己不能代寫。
+3. reviewer 的 gate 不變（只認檔案那一列），維持 fail-safe。
+
+> 問卷本身還有一個小缺口：只有兩個選項，缺「我去補設定／取消」這條路。三選項規則已寫進 orchestrator，下一輪會驗。
+

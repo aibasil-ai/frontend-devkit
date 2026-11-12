@@ -105,6 +105,13 @@
    - **停用整條 security pack（這是嚴重項的真正破口）**：把你原本該啟用的 `security/vue-xss` 從 `## 啟用規則` **整條刪掉**時，啟用清單與 `resolved.md` 依然一致、compile 合法、各關全過 —— 因此規則改為：`compile`／`init` 發現「啟用規則內沒有任何 `security/*`」→ **醒目警告**；流程啟動前需**二次確認**，且確認的執行者要對得上權限（第 4 輪指出 `/review` 直入 reviewer、而 reviewer `question: deny`，問不了）：
      - `/frontend-devkit/dev`、`/fix`、`/review-fix`（都是 orchestrator，`question` 為 allow）→ 由 orchestrator 用 `question` 要你明確確認，選項文字必須寫出後果：「僅執行主體基本安全項，不含專案專屬的 sanitizer／白名單檢查」；未確認不得進入流程。
      - `/frontend-devkit/review`（直入 reviewer，無 `question` 權限）→ reviewer **不開始審核**，輸出固定句「啟用清單無 `security/*`，需二次確認；請改走 `/frontend-devkit/review-fix`（由 orchestrator 詢問），或由你在 profile 明示 `## 專案覆寫`：『已確認僅執行主體基本安全項』後重跑」。**不得**由 reviewer 自行假設你已同意。
+     - **「延後」不是「確認」（第 6 站缺陷 J）**：`question` 的選項**只准三種**——①「確認僅執行主體基本安全項，繼續」（＝同意，流程可走）②「我先去補 pack／改設定，這次不開發」（＝**結束流程**，不得開發、不得派工）③「取消」。**嚴禁**提供「我自己改 project.md 後繼續」這種「一邊延後一邊開工」的混合選項；使用者選②時 orchestrator 必須**立即停止**並說明要改什麼（補 `security/*` 到啟用規則，或在 `## 專案覆寫` 寫入本節第 4 點定義的**標準覆寫列**）。
+   - **D18 覆寫的標準寫法（缺陷 K；避免各 agent 自創格式、gate 靠自由文字 grep）**：在 `## 專案覆寫` 新增**一列**，欄位名固定為 `securityOverride`：
+     ```md
+     | securityOverride | 僅主體基本安全項 | 已確認僅執行主體基本安全項（YYYY-MM-DD；本專案啟用清單無 security/*，同意只查主體常駐危險模式） |
+     ```
+     orchestrator 在**每次派工前**要重新確認 gate（不能只看上一輪的問答記憶）：若啟用清單無 `security/*`，滿足**任一**即可派工——(a) 這一列存在且理由非空，或 (b) **本次呼叫**的 D18 `question` 已由使用者選①同意（跨呼叫一律重問，不得沿用上一次呼叫的同意）。reviewer 的 gate 只認這一列的欄位名 `securityOverride`，出現於其他位置的自由文字（包含 `resolved.md` 的警告本身）**不得**當成授權。
+    - **授權的傳遞（缺陷 J 的真正破口）**：orchestrator 的 `edit` 是 **deny**，它**不能代寫** `project.md`，所以「問卷同意」與「reviewer 的 gate」之間沒有共用狀態。規則因此是：使用者選①的那一回合，orchestrator 必須**立即印出**上表那一列、並明說「`/review` 前要貼，否則 reviewer 會拒審」；**不得**只說「已確認，繼續」。這樣才不會重演第 6 站的落差：dev 依問卷同意開發了，review 卻因檔案沒有那一列而拒審——兩邊都「照規則做」，結果卻互相矛盾。
      確認（或你在 profile 明示）後，reviewer 仍要執行第 0 點基本項，並在回報標「本專案未啟用安全 pack，僅執行主體基本項」。
 4. 欄位值為 `TBD（未確認）` —— 該檢查跳過，且必須在回報註明「因設定檔未確認，未執行 X」；**不得宣稱已覆蓋，但也不因此擋 VERDICT**（見 §10.4 的兩態判定語）。
 
