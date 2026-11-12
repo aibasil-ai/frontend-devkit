@@ -1,14 +1,9 @@
 # 權限規格（主檔 §7.3 的外移附檔）
 
 > 本檔是實作 frontmatter 與 `setup` 檢查器的唯一權威來源。原 §16 已併入主檔 §2；審核史見 `CHANGELOG.md`。
+>
+> 本檔是 `specs/2026-11-11-frontend-devkit-design.md`（主檔）的附檔。章節編號沿用主檔原編號以維持引用穩定；文中 `§X` 若帶檔名前綴（如 `acceptance.md §13`）指附檔，**未帶前綴的 `§X` 一律指主檔**。主檔頂端的「0. 檔案地圖」是全套檔案的入口。
 
-> **本檔是 `specs/2026-11-11-frontend-devkit-design.md`（主檔）的附檔。**
-> 章節編號沿用主檔original編號以維持引用穩定；文中 `§X` 若帶檔名前綴（如 `acceptance.md §13`）指附檔，**未帶前綴的 `§X` 一律指主檔**。
-> 主檔頂端的「0. 檔案地圖」是全套檔案的入口。
-
-> **本檔是 `specs/2026-11-11-frontend-devkit-design.md`（主檔）的附檔。**
-> 章節編號沿用主檔original編號以維持引用穩定；文中 `§X` 若帶檔名前綴（如 `acceptance.md §13`）指附檔，**未帶前綴的 `§X` 一律指主檔**。
-> 主檔頂端的「0. 檔案地圖」是全套檔案的入口。
 ### 7.3 權限規格（本 kit 最需要小心的部分）
 
 #### 7.3.0 術語定義：方案 A / 方案 B（G12 補，之前全檔引用卻從未定義）
@@ -97,7 +92,9 @@ developer 的尾巴群（逐條展開、**不含 pipe**；依 §7.1 三段式排
 
 > **承認遮不住全部**（新增 R9）：前綴式白名單／黑名單無法窮盡繞道（例：`npx --package pnpm pn add x`、自訂 npm alias、`node scripts/install.js`）。所以 kit 的最終關卡不是 shell 規則，而是**既有兩道紀律**：developer 必須醒目標報「是否改動 `package.json`」、reviewer 必須用 `git diff` 檢查 `package.json`／lockfile 是否被動。主體提示詞要把這句寫明：「shell 規則只是護欄，不是保險」。
 
-#### 7.3.4 跨來源紀律（**方案 A 的保留條款**）\n\n> **現況標記（第 5 輪）**：xperiments.md 第 3 題實測後，**方案 B 是現行預設**，本節第 1–6 點只有在「方案 A 依 permission-spec.md §7.3.0 先決步驟覆驗成功」後才會啟用；**第 7 點（設定檔與 .git/ 只准 setup 寫）是兩案通用的現行紀律**。另加一條 B 紀律：**專案端設定只准出現 instructions 與 model**，inspect 若偵測到 gents.<id>.permissions 含 shell 條目即警告（依實測它不會生效，留著只會誤導人以為已授權）。
+#### 7.3.4 跨來源紀律（**方案 A 的保留條款**）
+
+> **現況標記（第 5 輪）**：`experiments.md` 第 3 題實測後，**方案 B 是現行預設**，本節第 1–6 點只有在「方案 A 依 §7.3.0 先決步驟覆驗成功」後才會啟用；**第 7 點（設定檔與 `.git/` 只准 `setup` 寫）是兩案通用的現行紀律**。另加一條 B 紀律：**專案端設定只准出現 `instructions` 與 `model`**，`inspect` 若偵測到 `agents.<id>.permissions` 含 shell 條目即警告（依實測它不會生效，留著只會誤導人以為已授權）。
 
 1. **同一 `action` 的「地板」只能由主體 frontmatter 定義**。專案端 `opencode.json` 的 `agents.<id>.permissions` **僅准許**追加：更窄的 `allow`（該專案特有的 gate 指令，如 `pnpm --filter web test *`）或更嚴的 `deny`。不得在專案端追加 `{"resource":"*"}` 等級的規則。
 2. **關鍵前提（G3＋第 3 輪修正：比對對象要明确排除地板，否則方案 A 被自己封殺）**：專案端追加的每一條 `allow`，**不得命中主體「尾巴三段式第 1、2 段」的任何 deny pattern**。注意**不含** `resource: "*"` 的那條地板 deny——若把地板也算進比對，任何窄域 allow 都命中 `*`，`setup` 會拒絕寫入**所有**專案端 allow，與本節第 1、4 點和 permission-spec.md §7.3.0 方案 A 直接矛盾。只有滿足這個前提，「兩種次序都不偏鬆」才成立：若次序是「jsonc 先、.md 後」且該 allow 命中第 1／2 段 deny，最後符合者勝就會**翻掉地板**。另需記得 D14 所稱「任何 allow 蓋不掉」的地板**僅指第 1 段**，第 2 段可被第 3 段例外翻回（§7.1）；而官方只保證「持久批准（`allow always` 存下的規則）蓋不掉設定的 deny」，並未保證 jsonc 規則蓋不掉 `.md` 的 deny。
