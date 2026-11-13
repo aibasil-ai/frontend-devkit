@@ -416,3 +416,38 @@ app-a 七次 compile 都是「檔頭條列＋`## 專案參數`」；app-b 第一
 - 第 2 條 `git commit --allow-empty -m probe` 仍 `denied` ✅ 未提權。
 - 它主動指出 `package.json` 的 `name` 是 `app-a`，並明確標「僅陳述，未代改」。
 
+## 關卡 6 後半（第 2 輪）：`compile` 修好 W／X，但暴露 Y、Z
+
+新 session 重跑 `/frontend-devkit/init compile`（第 3 次）。實測產物：
+
+| 項目 | 結果 |
+|---|---|
+| `resolved.md` | **182 行**（原本 143） |
+| pack 正文 | ✅ `## 啟用 pack 正文：security/vue-xss`，38 行**原文照錄**（含 frontmatter），`綁定回溯`／`清理時點`／`fail-closed`／`地雷`／`不得放寬` 全部命中 |
+| 檔頭 | ✅ 條列（`- 欄位：值`），不再是表格 |
+| 章節順序 | ✅ 檔頭→專案參數→gate→worktree→pack 正文→專案依據→警告（四段主順序與規格一致） |
+| 預設審核範圍 | ✅ `--working`，TBD 歸零 |
+| 自我驗證 | ✅ 它自己列出行號（`綁定回溯` L138、`fail-closed` L143/162），不是宣稱 |
+| 產生時間 | `2026-11-13（compile 第 3 次）` |
+
+它還主動指出「`project.md` 的 `## 安裝紀錄` 還寫著 reviewer 缺 `Get-Location`，但主體第 33 行已經有了」——**沒有自行改 `## 安裝紀錄`**（那是 probe 的職責），只把落差留在 `resolved.md` 的警告。這個界線拿捏是對的。
+
+### 缺陷 Y：回報「權限不足」卻沒查清單（與 S 同型，發生在 setup）
+
+它說「本輪 shell 只有 `Get-Location`、`Get-FileHash`、`opencode --version`、`git rev-parse --short HEAD` 被放行」、「`git check-ignore` 無法執行」。實測 `setup.md` 的 allow 清單：
+
+- `git check-ignore *` **在清單裡**（L32 附近）→ 那句是錯的；
+- 另有 `git status`／`git diff`／`git log`／`git rev-parse`／`git symbolic-ref`／`git remote show`／`git worktree list`／`npm ls`／`npm view` 等十幾條可用，不是只有四條。
+
+它這次沒造成損害（`環境檔＝無`，該步本來就跳過），但**S 的病灶沒有消失，只是換角色發作**：一次複合指令被拒 → 推論成「這條不能用」。
+
+修法：`setup.md` §5 新增 **5c**——回報「某指令沒權限」前先 `read` 自己的 allow 清單逐條確認，不得因複合指令被拒就推論個別指令不可用。
+
+### 缺陷 Z：新加的 6b／5b 要求 `Select-String`，但 setup 沒有該權限（我造成的）
+
+`setup.md` 的 allow 清單沒有 `Select-String`，也沒有 `Test-Path`。我上一輪把「用 `Select-String` 驗證」寫進 6b／5b，等於重演 V 的錯誤（規格要求一個沒有權限的指令）。
+
+修法：
+1. `setup.md` allow 清單新增 `Select-String *`、`Test-Path *`（兩者皆唯讀、無寫入風險）。
+2. 6b／5b 措辭改為「用 `Select-String`（若不可用則 `read` 逐行）」，避免再次把單一工具寫死。
+

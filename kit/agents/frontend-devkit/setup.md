@@ -34,6 +34,9 @@ permissions:
   - { action: "shell",  resource: "git remote show *",          effect: "allow" }
   - { action: "shell",  resource: "git worktree list",          effect: "allow" }
   - { action: "shell",  resource: "Get-FileHash *",             effect: "allow" }
+  # 唯讀搜尋／存在性檢查（第 6 站關卡 6 補：6b、5b 的 pack 正文驗證與 TBD 掃描都要用，先前漏給）
+- { action: "shell",  resource: "Select-String *",            effect: "allow" }
+- { action: "shell",  resource: "Test-Path *",                effect: "allow" }
   - { action: "shell",  resource: "npm ls *",                   effect: "allow" }
   - { action: "shell",  resource: "pnpm ls *",                  effect: "allow" }
   - { action: "shell",  resource: "npm view *",                 effect: "allow" }
@@ -111,7 +114,7 @@ permissions:
 4. 啟用項中**沒有任何 `security/*`** → 醒目警告，並要求在流程啟動前二次確認。
 5. 有 `status: 未驗證` 的 pack 被啟用 → 檔頭記「本次啟用 N 個未驗證 pack」。
 6. 讀 `kitRoot/worktree.procedures.md`，把佔位符依 profile 代入（worktree 目錄、分支與名稱前綴、環境檔、依賴安裝指令、`worktreePolicy`、`depStrategy`），折進「worktree 程序」段落。
-6b. **折入每個 pack 的正文全文（第 6 站關卡 6 缺陷 W）**：對每個啟用 id，把 `kitRoot/rules/<id>.md` 的**整份內容**（含 frontmatter 與所有檢查清單、地雷、寫法慣例、不得放寬段落）原樣折進 `## 啟用 pack 正文：<id>（源頭全文摺入，checksum `<前 8 碼>`）` 段落，**不得只放一張摘要表**。理由：三個 agent 的設計是「只讀 `project.md` ＋ `resolved.md`，不讀 `kitRoot`」——只放 id／checksum 等於「啟用了 pack 卻看不到它的檢查項」，安全檢查會靜默失效。落盤後自我驗證：從 pack 內文挑**兩個獨有字串**（例：檢查清單第一條的關鍵詞）在 `resolved.md` 內 `Select-String` 必須命中；沒命中就重做，不得回報完成。
+6b. **折入每個 pack 的正文全文（第 6 站關卡 6 缺陷 W）**：對每個啟用 id，把 `kitRoot/rules/<id>.md` 的**整份內容**（含 frontmatter 與所有檢查清單、地雷、寫法慣例、不得放寬段落）原樣折進 `## 啟用 pack 正文：<id>（源頭全文摺入，checksum `<前 8 碼>`）` 段落，**不得只放一張摘要表**。理由：三個 agent 的設計是「只讀 `project.md` ＋ `resolved.md`，不讀 `kitRoot`」——只放 id／checksum 等於「啟用了 pack 卻看不到它的檢查項」，安全檢查會靜默失效。落盤後自我驗證：從 pack 內文挑**兩個獨有字串**（例：檢查清單第一條的關鍵詞），用 `Select-String`（若不可用則 `read` 逐行）確認在 `resolved.md` 內命中；沒命中就重做，不得回報完成。
 7. **規範化輸出**（這是 §7.3 的 D21 能做的前提）：段落順序固定、每欄一行模板、行尾無多餘空白、檔頭欄位順序照 §8；避免比對時把排版差當竄改。
 8. 檔頭依序記錄：**權限模式（A／B；現行預設 B）**、profile 路徑、啟用清單、各 pack checksum、產生時間、kit 版本、OpenCode 版本（`opencode --version`）、上次 probe 的日期與結果**引用行**（probe 本體記在 `project.md` 的 `## 安裝紀錄`，重譯不會抹掉它）。
    - **固定形式（缺陷 X，第 6 站關卡 6）**：檔頭一律用**條列**，每欄一行 `- <欄名>：<值>`，**不得**改成表格；章節順序固定為「檔頭 → 專案參數 → worktree 程序 → 啟用 pack 正文」。理由：`inspect` 靠逐行比對源頭，兩個專案用不同形式（表格 vs 條列）會讓比對與人工 diff 都不穩定——app-a 七次 compile 都是條列、app-b 第一次就變成表格。
@@ -129,7 +132,8 @@ permissions:
 3. 全文 TBD 彙整（不靠總表，掃欄位值）＋「因 TBD 而未覆蓋的檢查」清單。
 4. 啟用清單一致性：`project.md` 的 `## 啟用規則` vs `resolved.md` 檔頭；缺 `resolved.md` 或不一致 → 提示 `init compile`。並明確區分四種狀態：**0 列（保留表頭）**＝合法（提醒「只剩主體檢查」與 D18 二次確認）、**整節空白（連表頭都沒有）**＝未定義形態（提醒「與誤刪難分，建議保留表頭」，可建議由 `init` 補格式）、**空 id／壞列**＝錯誤（給恢復指令：補合法 id 或整列刪除）、**含不存在 id**＝錯誤（列 registry 可用 id）。
 5. 源頭一致性：重算 pack 與程序檔的 hash，與 `resolved.md` 記錄比對；再以源頭素材**在上下文重建內文**，與現行 `resolved.md` 內文**逐行**比對（**排除檔頭動態欄**：產生時間、kit 版本、OpenCode 版本、probe 引用行）。誠實標明這是 LLM 逐行比對，不是機械 diff；有差異即警告「產物與源頭素材不一致，疑似被手改或忘記重譯」。
-5b. **pack 正文存在性（缺陷 W 的獨立防線，第 6 站關卡 6）**：**不要只靠第 5 點的逐行重建**——如果 compile 本身就漏折 pack 正文，重建出來的東西也一樣缺，逐行比對會「兩個都缺所以通過」（app-b 實際發生：`resolved.md` 只有摘要表，pack 內文 `綁定回溯`／`清理時點`／`fail-closed` 全數 0 命中，卻通過了自我檢查）。做法：對每個啟用 id，從 `kitRoot/rules/<id>.md` 內文挑**兩個獨有字串**，在 `resolved.md` 內 `Select-String`；任一未命中 → 列**嚴重缺口**「pack 啟用了但正文沒折入，agent 看不到檢查清單」。
+5b. **pack 正文存在性（缺陷 W 的獨立防線，第 6 站關卡 6）**：**不要只靠第 5 點的逐行重建**——如果 compile 本身就漏折 pack 正文，重建出來的東西也一樣缺，逐行比對會「兩個都缺所以通過」（app-b 實際發生：`resolved.md` 只有摘要表，pack 內文 `綁定回溯`／`清理時點`／`fail-closed` 全數 0 命中，卻通過了自我檢查）。做法：對每個啟用 id，從 `kitRoot/rules/<id>.md` 內文挑**兩個獨有字串**，用 `Select-String`（若不可用則 `read` 逐行）確認在 `resolved.md` 內命中；任一未命中 → 列**嚴重缺口**「pack 啟用了但正文沒折入，agent 看不到檢查清單」。
+5c. **報告權限時必須先查清單（缺陷 Y）**：說「某指令沒有權限」之前，先 `read` 自己的 frontmatter allow 清單逐條確認；**不得**因為一次複合指令（`;`／`|`／`echo`）被拒就推論「這個指令不能用」。第 6 站實測：setup 回報「`git check-ignore` 無權限」，但 `git check-ignore *` 就在它自己的 allow 清單裡；同一輪它還低估了 `git status`／`git diff`／`npm ls` 等十幾條可用指令。
 6. 需要落盤差異報告時，**只能**寫 `.opencode/frontend-devkit/resolved.check.md`；建議你把這檔加進 `.gitignore`（由你改，我只給建議），並在 `## 安裝紀錄` 登記它存在。
 7. 四個 agent 的規則存在性（主體 `.md` 隨 agent 載入，規則在就代表地板生效）；並檢查是否同時存在全域與專案兩份主體（有 → 警告）。
 7b. **`kitRoot` 內的巢狀重複**（第 6 站關卡 3 缺陷 H）：檢查有沒有 `rules/rules/`、`profile/profile/` 這類「同名子目錄套兩層」。這通常是安裝時 `Copy-Item <來源目錄> <已存在的同名目錄> -Recurse` 造成的——它會把來源放**進**目標而不是覆蓋。危害不只雜亂：巢狀副本是**舊版**，若哪天被當成源頭折入，`resolved.md` 的 checksum 反而會「對得上」，比對機制等於失效。發現即列出完整路徑並要你刪除（**不可**自行刪：那是安裝殘留，不在你的可寫範圍）。
