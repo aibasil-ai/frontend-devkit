@@ -35,8 +35,8 @@ permissions:
   - { action: "shell",  resource: "git worktree list",          effect: "allow" }
   - { action: "shell",  resource: "Get-FileHash *",             effect: "allow" }
   # 唯讀搜尋／存在性檢查（第 6 站關卡 6 補：6b、5b 的 pack 正文驗證與 TBD 掃描都要用，先前漏給）
-- { action: "shell",  resource: "Select-String *",            effect: "allow" }
-- { action: "shell",  resource: "Test-Path *",                effect: "allow" }
+  - { action: "shell",  resource: "Select-String *",            effect: "allow" }
+  - { action: "shell",  resource: "Test-Path *",                effect: "allow" }
   - { action: "shell",  resource: "npm ls *",                   effect: "allow" }
   - { action: "shell",  resource: "pnpm ls *",                  effect: "allow" }
   - { action: "shell",  resource: "npm view *",                 effect: "allow" }

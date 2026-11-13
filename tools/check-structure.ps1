@@ -12,10 +12,13 @@ foreach ($a in Get-ChildItem 'kit\agents\frontend-devkit' -File) {
   $fm = $L[1..($end - 1)]
   $rules = @($fm | Where-Object { $_ -match '^\s*-\s*\{' })
   $bad = @($rules | Where-Object { $_ -notmatch '\{\s*action:\s*".*",\s*resource:\s*".*",\s*effect:\s*"(allow|deny|ask)"\s*\}' })
+  # 縮排檢查（第 6 站：一條頂格規則會讓整份 YAML 失效，opencode 直接跳過 agent → Agent not found）
+  $dedented = @($fm | Where-Object { $_ -match '^-\s*\{' })
   $slashes = @($fm | Where-Object { $_ -match '//' })
   $keys = @($fm | Where-Object { $_ -match '^[a-z]+:' } | ForEach-Object { ($_ -split ':')[0] }) -join ','
-  Write-Output ('{0,-16} 規則數={1,-4} 頂層鍵={2,-32} 格式不符={3,-3} 雙斜線={4}' -f $a.Name, $rules.Count, $keys, $bad.Count, $slashes.Count)
+  Write-Output ('{0,-16} 規則數={1,-4} 頂層鍵={2,-32} 格式不符={3,-3} 雙斜線={4} 頂格規則={5}' -f $a.Name, $rules.Count, $keys, $bad.Count, $slashes.Count, $dedented.Count)
   foreach ($b in $bad) { Write-Output ('    不合式：' + $b.Trim()) }
+  foreach ($d in $dedented) { Write-Output ('    FAIL 規則未縮排（整份 YAML 會失效）：' + $d) }
 }
 
 Write-Output '=== 2. 主體是否混入專案專屬事實（應全為 0）==='

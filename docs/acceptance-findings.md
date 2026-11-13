@@ -451,3 +451,41 @@ app-a 七次 compile 都是「檔頭條列＋`## 專案參數`」；app-b 第一
 1. `setup.md` allow 清單新增 `Select-String *`、`Test-Path *`（兩者皆唯讀、無寫入風險）。
 2. 6b／5b 措辭改為「用 `Select-String`（若不可用則 `read` 逐行）」，避免再次把單一工具寫死。
 
+## 我自己的重大失誤（AA）：一條沒縮排的規則讓整個 `setup` agent 消失
+
+改完 Z 之後，使用者重跑 `/frontend-devkit/inspect`，得到：
+
+```
+Failed to set up session — Agent not found: frontend-devkit/setup
+```
+
+我一開始誤以為是「orchestrator 無權派工 setup」，查 log 才看到真正的根因：
+
+```
+WARN  message="agent file skipped" filepath="...\app-b\.opencode\agents\frontend-devkit\setup.md" reason=markdown
+ERROR message="command execution failed" command=frontend-devkit/inspect error="Error: Agent not found: frontend-devkit/setup"
+```
+
+**我在 `setup.md` 的 `permissions` 清單裡插入兩條規則時漏了縮排**：
+
+```yaml
+  - { action: "shell",  resource: "Get-FileHash *", ... }
+  # 唯讀搜尋…
+- { action: "shell",  resource: "Select-String *", ... }   ← 頂格，把序列截斷
+- { action: "shell",  resource: "Test-Path *", ... }       ← 同上
+  - { action: "shell",  resource: "npm ls *", ... }
+```
+
+YAML 因此失效 → opencode 直接**跳過**這份 agent 定義 → 指令找不到 `frontend-devkit/setup`。這不是「權限不足」，是「agent 根本不存在」。
+
+### 為什麼既有的健檢沒抓到
+
+`tools/check-structure.ps1` 用 `^\s*-\s*\{` 找規則——`\s*` **允許零空白**，所以頂格那兩條仍然「符合格式、規則數正確、格式不符 0」。也就是說：**檢查器本身有盲點，而它給了我假的安心**。
+
+修法（已落地）：
+1. 縮排修正（`Select-String`／`Test-Path` 兩條回到兩個空白）。
+2. `check-structure.ps1` 新增「頂格規則」檢查：任何 `^-\s*\{` 一律印 `FAIL 規則未縮排（整份 YAML 會失效）`；並用一段模擬內容驗證它真的抓得到。
+3. 驗證方式：修正後 opencode 的 watcher 重新載入，log 只出現 `agent.updated`、不再有 `agent file skipped`，`inspect` 即可恢復。
+
+> 這是整輪驗收裡**唯一一次讓功能完全不可用**的缺陷，而且是我造成的。教訓有兩層：① 手改 YAML 縮排後要**用真正的載入器驗**，不能只靠自製 regex 檢查；② 錯誤訊息「Agent not found」不代表權限問題，要先查 log 的 `agent file skipped`／`reason`。
+
