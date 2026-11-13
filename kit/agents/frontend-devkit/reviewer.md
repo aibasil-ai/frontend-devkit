@@ -20,6 +20,9 @@ permissions:
   - { action: "shell",  resource: "git ls-tree *",              effect: "allow" }
   - { action: "shell",  resource: "git cat-file *",             effect: "allow" }
   - { action: "shell",  resource: "git check-ignore *",         effect: "allow" }
+  # 基準指紋（缺陷 AD）：`git diff HEAD | git hash-object --stdin` 是管線，scanner 拆句後
+  # 兩段都必須 allow，否則整串被拒；缺這條就等於 M 的指紋要求無法執行。
+  - { action: "shell",  resource: "git hash-object *",          effect: "allow" }
   - { action: "shell",  resource: "git worktree list",          effect: "allow" }
   - { action: "shell",  resource: "git branch --show-current",  effect: "allow" }
   # ── 放行：審核 worktree 的建立與清除（全部具名到 review- 前綴，不給任意路徑）
