@@ -29,6 +29,8 @@ permissions:
   - { action: "shell",  resource: "Resolve-Path node_modules",  effect: "allow" }
   - { action: "shell",  resource: "Copy-Item * .worktrees/review-*", effect: "allow" }
   - { action: "shell",  resource: "Test-Path .worktrees/review-*", effect: "allow" }
+  # 落點確認：probe 第 0 條（主檔 §8.2）以 reviewer 身分執行，且建 review-* worktree 用相對路徑前也要確認 cwd
+  - { action: "shell",  resource: "Get-Location",               effect: "allow" }
   - { action: "shell",  resource: "cmd /c rmdir .worktrees/review-*", effect: "allow" }
   # ── 放行：不可變安裝與驗證 gate（靜態清單，逐條展開；不用 npm run * 這種涵蓋所有 script 的通配）
   - { action: "shell",  resource: "npm ci *",                   effect: "allow" }

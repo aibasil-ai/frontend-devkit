@@ -379,3 +379,40 @@ orchestrator 自己跑了 `git status`／`git diff --stat`，並寫「reviewer s
 
 關卡 6 第 4 步「拿掉 `.opencode/opencode.json` 的 `agents` 節點後，非白名單指令仍被拒」需要 app-b 先跑過 `init`（才會產生該檔），本輪未做。
 
+## 關卡 6 後半：app-b 實跑 `init` → **測試到 V、W、X，其中 W 是嚴重缺陷**
+
+app-b 的 `init` 完成：`project.md`（118 行）、`resolved.md`、`.opencode/opencode.json`（只有 `instructions` 兩筆）、`## 安裝紀錄` 四項齊。值驗證、gate 判定（test／lint＝無、build＝`npm run build`）、`worktreePolicy=ask`、`depStrategy=install-per-worktree`、`security/vue-xss` 都正確；它也主動指出 `package.json` 的 `name` 還是 `app-a`（誠實）。
+
+### 缺陷 V：probe 的執行者與指令權限不一致（我先誤判、後更正）
+
+`setup.md` §6 寫「用你的唯一派工例外**叫一個 reviewer** 依序跑三條」，而主檔 §8.2 要求第 0 條是 `Get-Location`；但 `reviewer.md` 的 allow 清單**沒有**它（實測：L11 `shell "*"` deny、L13–56 的 allow 條目逐條看過都沒有）。於是 probe 第 0 條必然 `denied`。
+
+app-b 這次改用 `git rev-parse --show-toplevel` 替代並**如實登記為缺口**（`project.md` L118、`resolved.md` 警告 4）；反觀 app-a 那一輪把同一件事記成「reviewer 版被拒為設計內」——**那是把規格矛盾合理化**，因為 `git rev-parse` 回的是 repo root，不等於 shell cwd。
+
+> 我自己第一眼也把它判成「誤報、不該給 reviewer 擴權」，看到 §6 原文才更正。這是本輪第二次「先下判斷、後查原文」的錯誤，記在這裡當提醒。
+
+修法：`reviewer.md` 新增 `Get-Location` allow（唯讀、無寫入風險；reviewer 建 `review-*` worktree 也用相對路徑，本來就需要確認 cwd）；主檔 §8.2 補上這段因果。
+
+### 缺陷 W（**嚴重**）：`compile` 沒有把 pack 正文折進 `resolved.md`
+
+| 檢查 | app-b（壞） | app-a（好） |
+|---|---|---|
+| `## 啟用 pack` | 一張摘要表（id／標題／status／checksum／covers） | 摘要＋`## 啟用 pack 正文：security/vue-xss` 整段 38 行 |
+| pack 內文獨有字串（`綁定回溯`／`清理時點`／`fail-closed`／`地雷`） | **全部 0 命中** | 全部命中 |
+
+後果最嚴重的一條：**三個 agent 的設計是「只讀 `project.md` ＋ `resolved.md`，不讀 `kitRoot`」**。正文沒折進去，reviewer 只會知道「有這個 pack、checksum 是多少」，**看不到要查什麼**——安全檢查靜默失效，而所有檢查關卡都會通過（因為沒有任何一關在驗「pack 內文在不在」）。
+
+修法：
+1. `setup.md` §4 新增 **6b**：每個啟用 id 的**整份內容**（含 frontmatter、檢查清單、地雷、寫法慣例、不得放寬）原樣折進 `## 啟用 pack 正文：<id>（…checksum …）`，**不得只放摘要表**；落盤後用兩個獨有字串自我驗證，未命中不得回報完成。
+2. `setup.md` §5 新增 **5b**：`inspect` 不能只靠「逐行重建比對」——compile 漏折時，重建也一樣漏，會「兩個都缺所以通過」（app-b 就是這樣通過自我檢查的）。必須對每個 pack 抽兩個獨有字串獨立驗證存在性。
+
+### 缺陷 X：`resolved.md` 格式漂移（條列 vs 表格）
+
+app-a 七次 compile 都是「檔頭條列＋`## 專案參數`」；app-b 第一次就變成「檔頭表格＋`## 專案摘要`」，連標題都不同。原因是 §8 只寫「依序記錄」，**沒規定形式**。`inspect` 靠逐行比對源頭，形式不固定會讓比對與人工 diff 都不穩定。修法：§4 第 8 點明定**條列**（每欄一行 `- 欄名：值`）與固定章節順序，禁止表格。
+
+### 這輪的正向訊號
+
+- probe 第 1 條 `npm run build` 是 **allowed 但 exit 1**（沒有 `node_modules`，`'vite' is not recognized`）——它正確區分「權限層通過」與「執行失敗」，沒有把 exit 1 說成「gate 通過」。
+- 第 2 條 `git commit --allow-empty -m probe` 仍 `denied` ✅ 未提權。
+- 它主動指出 `package.json` 的 `name` 是 `app-a`，並明確標「僅陳述，未代改」。
+

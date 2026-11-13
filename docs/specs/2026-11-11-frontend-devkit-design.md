@@ -482,7 +482,7 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 **執行者（G4 定案）**：`setup`。它在 §7.1 的 `subagent` 是「deny，唯一例外 allow `frontend-devkit/reviewer`」——因為能被寫進設定檔的只有 setup，而 reviewer 本身唯讀、不能再派工，風險限於「執行一條指令並回報結果」。流程作為 init／compile 的最後一步，以及每次 kit 升級後的檢查：
 
-1. **方案 B 下的定位（第 5 輪重定義）**：專案端已不寫 shell 規則，「判別跨來源次序」在 B 下**無物件可測**，因此 probe 改為**版本迴歸偵測**。**第 0 條必先是 `Get-Location`**（`experiments.md` 二.1：shell 落在 service 綁定的專案目錄，可能不是你以為的那個），用來確認落點就是本專案；第 1 條測「主體靜態清單內的 gate」（例 `npm test *`）→ 預期 allow。原本的「第 1 條必須只來自專案端 jsonc」判別力設計，**整段移入 permission-spec.md §7.3.0 的方案 A 復活檢測**。
+1. **方案 B 下的定位（第 5 輪重定義）**：專案端已不寫 shell 規則，「判別跨來源次序」在 B 下**無物件可測**，因此 probe 改為**版本迴歸偵測**。**第 0 條必先是 `Get-Location`**（`experiments.md` 二.1：shell 落在 service 綁定的專案目錄，可能不是你以為的那個），用來確認落點就是本專案；第 1 條測「主體靜態清單內的 gate」（例 `npm test *`）→ 預期 allow。原本的「第 1 條必須只來自專案端 jsonc」判別力設計，**整段移入 permission-spec.md §7.3.0 的方案 A 復活檢測**。（第 6 站關卡 6 補：probe 由 **setup 派一個 reviewer** 執行，所以 `reviewer.md` 的 allow 清單**必須**含 `Get-Location`——read-only、無寫入風險，且 reviewer 建 `review-*` worktree 用相對路徑前也需要確認 cwd。缺少它會讓「probe 第 0 條」與「worktree 相對路徑」都失去落點依據。app-a 曾以 `git rev-parse --show-toplevel` 替代並記為「設計內」，那是把規格矛盾合理化：`git rev-parse` 回的是 repo root，不等於 shell cwd。）
 2. 第 1 條（靜態清單 gate）→ 預期 allow；第 2 條（必被拒的寫入指令，例 `git commit --allow-empty -m probe`）→ 預期 deny。第 1 條若被拒＝清單與主體不同步或落點錯了（回到第 0 條查）。
 3. 結果判讀：**第 0 條的落點必須就是本專案**（`experiments.md` 二.1 的教訓），否則整輪 probe 無效、先修操作環境再重測。第 1 條被拒 → 主體靜態清單與 profile 期望不同步（依 permission-spec.md §7.3.0.1#2 走「需人工執行」，並檢查是不是清單該升級）；第 2 條被放行 → **立即停用 kit**，屬提權漏洞，停止並等你處理，`setup` 要在回報裡引用那條規則的出處（哪個檔案、哪個陣列位置）。
 4. probe 結果由 setup 寫進 **`project.md` 的 `## 安裝紀錄`**（含日期與 OpenCode 版本），**不寫進 `resolved.md`**——後者是 compile 每次重譯的產物，記錄放那裡會被抹掉（G4 的檔頭／檔尾矛盾就此消除；`resolved.md` 檔頭只留「上次 probe 於 <日期> 通過，詳見 project.md `## 安裝紀錄`」這一行引用）。
