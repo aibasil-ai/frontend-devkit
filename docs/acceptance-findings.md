@@ -489,3 +489,31 @@ YAML 因此失效 → opencode 直接**跳過**這份 agent 定義 → 指令找
 
 > 這是整輪驗收裡**唯一一次讓功能完全不可用**的缺陷，而且是我造成的。教訓有兩層：① 手改 YAML 縮排後要**用真正的載入器驗**，不能只靠自製 regex 檢查；② 錯誤訊息「Agent not found」不代表權限問題，要先查 log 的 `agent file skipped`／`reason`。
 
+## 關卡 6 後半（第 3 輪）：`inspect` 通過；建議 C 已修
+
+縮排修好後 `inspect` 正常執行，逐項查證如下（我抽驗了關鍵幾項，與它所述一致）：
+
+| 項目 | 結果 |
+|---|---|
+| 落點 | `Get-Location` 實際輸出＝app-b ✅（這次不再需要 `git rev-parse` 替代） |
+| 方案 B 一致性 | `opencode.json` 6 行、只有 `instructions` 兩筆、無 shell 條目 ✅ |
+| 四欄值 | 設定檔路徑／kitRoot／worktree 目錄（`git check-ignore` 回 `.gitignore:26`）／環境檔＝無（三態）✅ |
+| 值域 | `worktreePolicy=ask`、`depStrategy=install-per-worktree`（`Test-Path node_modules`＝False，理由相符）、`shell=powershell`、`預設審核範圍=--working` ✅ |
+| TBD | 0 個（`--working` 生效）✅ |
+| 啟用清單一致 | `project.md:69` ↔ `resolved.md:10`，id 存在於 registry 且 status 相符 ✅ |
+| checksum | `DBEFB238`／`9E09C3AA` 都與源頭一致 ✅ |
+| pack 正文 | `resolved.md:125–164` 與源頭逐句對照：frontmatter 6 欄、檢查清單 7 條、地雷 5 條、寫法慣例 3 條、不得放寬 2 條**全部在場**，無改寫 ✅ |
+| 5b 獨立防線 | `綁定回溯`（L138）／`fail-closed`（L143）實際 grep 命中 ✅ |
+| 5c 自檢 | 本輪 2 次 shell 被拒都是**複合指令**（`|`、`;`）；拆單條後全部成功，因此**沒有**再出現「我沒有某指令權限」的推論 ✅ |
+| 巢狀／worktree／model | 無 `rules/rules`、無 `profile/profile`、無 worktree 殘留、四個 subagent 繼承 session model ✅ |
+
+### 三條建議的處置
+
+| # | 內容 | 處置 |
+|---|---|---|
+| A | `project.md:115／:118` 仍寫「reviewer 缺 `Get-Location`」，但主體 L33 已有 | **待 `/inspect probe` 更新**。它明確拒絕手改 `## 安裝紀錄`（那是 probe 的職責）——這個界線是對的，也與關卡 3「不得沿用上輪結論」的修法一致：它**重驗後主動指出紀錄過時**，而不是照抄 |
+| B | `.opencode/` 未被 `.gitignore` 忽略（`check-ignore` 退出碼 1） | 由**commit `.opencode/`** 解決（納入版控後 `??` 消失）；kit 不代改 `.gitignore` |
+| C | 範本 L41「環境檔」的**合法值欄沒列「無」**，與三態規則有字面落差 | **已修**：`project.template.md` 與 app-b 的 `project.md` 都補上「或 `無`（已確認沒有環境檔，三態之一）」 |
+
+> C 是典型的「規則在別處、表格沒同步」——與缺陷 E（把保留詞列成合法值）同一個家族，只是方向相反：一個是**多列**、一個是**漏列**。`inspect` 的 2b 只檢查「有沒有把保留詞列成合法」，抓不到「漏列合法值」；這點已記下，暫不改（2b 的判別方向單向，屬可接受的殘留）。
+

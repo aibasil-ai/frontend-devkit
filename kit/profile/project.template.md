@@ -38,7 +38,7 @@
 | 設定檔路徑 | `opencode.json`／`opencode.jsonc`／`.opencode/opencode.json`／`.opencode/opencode.jsonc` 四種字面相對形之一 | `~/.config/opencode/opencode.json`（會改到全域設定，波及全機所有專案）、`.git/config`、絕對路徑 |
 | kitRoot | `~/.config/opencode/frontend-devkit` 或 `.opencode/frontend-devkit` | `/tmp/x`、其他 repo 的路徑（會掉包源頭比對基準） |
 | worktree 目錄 | 專案內相對路徑，如 `.worktrees/` | `../out`（工作區與環境檔落到專案外）、`/abs`、`<盤符>:\…`（絕對路徑形）、`.git`、`.opencode` |
-| 環境檔 | 單一檔名，可多檔逐檔列：`.env`、`.env.local` | `../secret.env`、`dir/.env`、`.env*`（萬用字元）、含 `:` 的任何形式 |
+| 環境檔 | 單一檔名，可多檔逐檔列：`.env`、`.env.local`；或 `無`（已確認沒有環境檔，三態之一） | `../secret.env`、`dir/.env`、`.env*`（萬用字元）、含 `:` 的任何形式 |
 
 ### 格式驗證欄（非白名單，值域固定）
 
