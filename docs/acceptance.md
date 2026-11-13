@@ -19,3 +19,49 @@
 | 8 零影響查核 | 本專案 TOS_Frontend | `git status --short`、`.opencode/` 內容、舊 `/dev` 抽測 | 工作區乾淨；四個檔 diff 為空；舊流程照常 |
 
 ---
+
+## 13.1 實測結果（2026-11-11 ～ 11-13，第 6 站）
+
+| 關 | 結果 | 關鍵證據 |
+|---|---|---|
+| 0 建置 | ✅ | app-a／app-b 可 build；kit 的 agent 未參與建置 |
+| 1 載入 | ✅ | 四個 agent＋六個指令可選；rules 未被誤認為 agent；寫入性指令被拒 |
+| 2 產生 | ✅ | `init` 在 app-b 實跑（第 6 關降級情境）；TBD 如實；設定檔只寫 `instructions` |
+| 3 compile | ✅ | 抓到源頭漂移（checksum＋title）、巢狀重複、0 pack、整節空白（缺陷 H、I） |
+| 4 流程 | ✅ | worktree＋junction 兩步、七區段、review FAIL→修正→PASS、清 worktree 未傷 `node_modules` |
+| 5 審核 | ✅ | 爛 commit（測試全綠）被 FAIL；XSS 與斷言弱化都被抓到 |
+| 6 降級 | ✅ | 無 profile 不派工、口述 gate 不虛報、`inspect probe` 三條正確 |
+| 7 安全地板 | ✅ | (a) 三選項＋選②零動作；(b) 覆寫未被當授權且判嚴重；(c) 豁免超限；(d) BLOCKED |
+| 8 零影響 | ✅ | `TOS_Frontend_Fia` 的 `git status` 乾淨、`.opencode/` diff 為空、mtime 停在 11/04 |
+
+### 缺陷索引（M 之後；A–K 見 `acceptance-findings.md` 前段）
+
+| # | 一句話 | 落點 |
+|---|---|---|
+| M | `VERDICT` 沒有基準 sha／指紋，commit 後無法證明「被審＝被 commit」 | `reviewer.md` §1／§6 |
+| N | 行號與數量憑印象（dev 偏 3 行×2、reviewer 錯 1 處） | `developer.md` §10、`reviewer.md` §1 |
+| O | 環境檔清單非空時，`.env` 未被 `.gitignore` 忽略仍會被複製 | `setup.md` §4 2b |
+| P | 把「標準 gate reviewer 可跑」說成「多半跑不起來」 | `orchestrator.md` §5 |
+| Q | `depStrategy` 推薦 `junction`，未驗 `node_modules` 存在 | `orchestrator.md` §5、`setup.md` §2 |
+| S | 複合指令被拒 → 誤判「我沒有 shell 權限」 | `reviewer.md` §1 |
+| T | 選「不要 worktree」仍問 `depStrategy` | `orchestrator.md` §5 |
+| U | 用「我補上」代替 reviewer 的獨立查證 | `orchestrator.md` §6 |
+| V | probe 由 reviewer 執行，但 reviewer 沒有 `Get-Location` | `reviewer.md` allow |
+| **W** | **`compile` 只放 pack 摘要表，沒折入正文 → agent 看不到檢查清單** | `setup.md` §4 6b、§5 5b |
+| X | `resolved.md` 格式漂移（條列 vs 表格、章節名不同） | `setup.md` §4 第 8 點 |
+| Y | 回報「某指令無權限」卻沒查自己的 allow 清單 | `setup.md` §5 5c |
+| Z | 規格要求 `Select-String`，但 allow 清單沒有它 | `setup.md` allow |
+| AA | 一條頂格規則讓整份 YAML 失效 → `Agent not found` | 縮排修正＋`check-structure.ps1` |
+| AB | 阻斷性 gate 與規劃性問題併問 | 未修（觀察項） |
+| AD | M 的指紋指令 `git hash-object` 不在 allow 清單 | `reviewer.md` allow |
+| AF | 回報引用了已還原的 `M src/App.vue` | `setup.md` §8 第 6 條 |
+| AG | `安裝紀錄` 的 compile 次數永遠追不上 `resolved.md` | `setup.md` §4 第 9 點 |
+| AH | agent 定義在 TUI 進程啟動時載入，「開新 session」不會重讀 → 假訊號 | `tui-run-checklist.md` 開頭＋本檔 |
+
+> 未成立、因此未修的編號：**L**（commit 未先審——實測有先審）、**AC**（`.opencode/` 干擾審核——實測未發生）、**AE**（compile 未拒總括豁免——規格本來就只要求 `setup` 寫入時與 `inspect` 驗，是我對關卡的期待寫錯）。
+
+### 這輪驗收真正的產出
+
+八關打勾只是門檻；**真正的產出是 26 個缺陷（A–AG）與 3 個「未成立」的撤回**。其中 5 個（H、I、W、AA、AD）屬於「不看實作就看不出來」的類型——尤其 **W**（pack 正文沒折入）會讓安全檢查**靜默失效而八關全過**，正是這套驗收流程存在的理由。
+
+---

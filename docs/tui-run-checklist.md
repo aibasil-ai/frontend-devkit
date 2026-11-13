@@ -4,6 +4,8 @@
 
 **kit 已專案區安裝**在兩個評測專案的 `.opencode/` 下（`agents/frontend-devkit/*`、`commands/frontend-devkit/*`、`frontend-devkit/{rules,profile,worktree.procedures.md}`），**沒有碰你的全域設定**。`project.md` 兩邊都還沒產生（由 init 建）。
 
+> **每次 kit 檔案有改動，務必「重啟 TUI 進程」再跑**（不是只開新 tab／新對話）。agent 定義是在進程啟動時載入的，開新 session 不一定會重讀檔案——第 6 站關卡 7 就因此出現一次假訊號：檔案已是新版，跑出來的仍是舊行為（缺陷 AH）。
+
 | 專案 | 路徑 | 現況 |
 |---|---|---|
 | app-a | `%LOCALAPPDATA%\Temp\opencode\frontend-devkit-eval\app-a` | Vite 8＋Vue 3＋vitest；scripts：`dev`／`build`／`test`＝`vitest run`／`lint`＝`node -e "console.log(1)"`（刻意的「任意執行」鉤子）；基線 2 個 commit |

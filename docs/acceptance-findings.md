@@ -617,3 +617,26 @@ D18（gate）與 worktree（規劃）是**同時**以兩個 tab 送出的。結�
 | (c) 總括式豁免 | ✅ `inspect` 標超限；`compile` 點名無效且不寫入 |
 | (d) 四個非法欄位值 | ✅ BLOCKED；四項全列、刻意不做下游檢查 |
 
+### 最終回歸：AG／AF 實證，並發現 AH
+
+重啟 TUI 進程後重跑 `init compile`：
+
+| 項目 | 結果 |
+|---|---|
+| AG | ✅ `## 安裝紀錄` 的「上次 init／compile」變成 `2026-11-13（compile 第 12 次，setup 執行）`，與 `resolved.md` 檔頭**同為第 12 次**；**probe 三列未被動** |
+| AF | ✅ 回報新增「8. 工作區狀態（報告前重跑）」：`git status` 只有 `?? .opencode/`、`worktree list` 只有主工作區——**不再提** `M src/App.vue` |
+| 額外 | 它把 worktree 程序第 2 節尾註從「2026-11-12 偵測」改成「2026-11-13 重驗」並附 `git check-ignore` 命中證據——這是「重驗而非沿用」的正確實作 |
+
+### 缺陷 AH：agent 定義在 TUI 進程啟動時載入，「開新 session」不會重新讀檔
+
+前一次 compile 的回報同時出現兩個舊行為（「compile 不改 `安裝紀錄`」＋「工作區有 `M src/App.vue`」），但檔案實測：
+
+```
+setup.md  kit 112EB6D6769D ＝ app-a 112EB6D6769D（一致，且含 AG／AF 新規則）
+app-a 工作區：只有 ?? .opencode/（App.vue 無 v-html）
+```
+
+→ 檔案是新的、**進程裡的定義是舊的**。這造成一次假訊號（看起來像 AG／AF 沒生效），我差點又去改一份其實已經正確的規格——與缺陷 N 同一個病灶：**用推測代替查證**。
+
+修法：驗收／操作文件一律寫「**重啟 TUI 進程**」而不是「開新 session／新 tab」；並在 `tui-run-checklist.md` 的開頭註明這條。
+
