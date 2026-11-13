@@ -89,6 +89,7 @@
 | 症狀 | 先查什麼 |
 |---|---|
 | `Agent not found: frontend-devkit/xxx` | agent `.md` 的 YAML 是否被跳過：opencode log 裡的 `agent file skipped`／`reason=markdown`。最常見是**規則行少了兩格縮排** |
+| agent 清單多出一個沒看過的 `frontend-devkit/...` | 設定檔 `agents` 的鍵**拼錯了**。OpenCode 不會忽略，而是建立一個 primary agent（無 system prompt、權限 `*/* allow`）；用 `opencode debug agents` 可確認，改掉那個鍵即可 |
 | 改了 kit 檔案但行為沒變 | agent 定義是**進程啟動時載入**：要重啟 TUI 進程，不是開新 tab |
 | 某指令「沒有權限」 | 先 `read` 該 agent 的 allow 清單逐一確認；複合指令（`;`、`&&`、`\|`、`echo`）被拒不等於單條也無權 |
 | `Get-Location` 落點不是你的專案 | shell 落在 service 綁定的專案目錄，`--server`／`--standalone`／cwd 都改不了它 |

@@ -132,3 +132,4 @@ src/components/Example.vue：vue/no-v-html（既有 warning，短期內不改；
 | worktree 建了但測試跑不起來 | 主工作區沒有 `node_modules` 卻選了 `junction` → 改 `install-per-worktree` |
 | `--working` 審核看到 `.opencode/` | 尚未把 kit 設定納入版控（commit 一次即可），或請 agent 明確排除 |
 | 回報說「某指令沒權限」 | 先讓它拆成單條重試；複合指令被拒不代表單條不可用 |
+| agent 清單多出沒看過的 `frontend-devkit/...` | `agents` 的鍵拼錯：OpenCode 會建立一個無 system prompt、權限 `*/* allow` 的 primary agent。用 `opencode debug agents` 確認後改掉 |

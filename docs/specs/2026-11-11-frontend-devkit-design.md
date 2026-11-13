@@ -450,6 +450,8 @@ covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint stand
 
 主體一律不寫 `model`（換機器 provider 不同會直接報錯；subagent 未設定時繼承父 session model）。要固定就在 init 時問一次、寫進 **profile `設定檔路徑` 所指的那份設定檔** 的 `agents.<id>.model`（D16）；`inspect` 會列出目前生效的 model 與其來源（主體／專案設定檔／繼承），並在根設定與 `.opencode` 設定並存時說明「後者蓋前者」的判定結果。
 
+> **`agents` 的鍵只准那四個（第 6 站實測）**：`frontend-devkit/orchestrator`／`developer`／`reviewer`／`setup`。拼錯一個字母**不會被忽略**——OpenCode 會建立一個新的 primary agent（無 system prompt、權限為預設 `*/* allow`、在 agent 清單可見），而你原本要設定的 agent 仍繼承 session model（等於「以為設了、其實沒設，還多一個全開的按鈕」）。實測：把 `reviewer` 打成 `reviewr`，`opencode debug agents` 就多出 `frontend-devkit/reviewr (mode=primary)`。`init` 寫入前與 `inspect` 都要驗這一條；要確認實際註冊了哪些 agent，用唯讀指令 `opencode debug agents`。
+
 ---
 
 ## 8. 指令規格

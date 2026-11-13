@@ -650,3 +650,52 @@ app-a 工作區：只有 ?? .opencode/（App.vue 無 v-html）
 
 因此把步驟 11 的驗收改為「唯讀證據」，並在此記錄豁免。若日後真的要驗舊流程，應在**複製出來的專案**上跑，而不是在正式專案。
 
+## 已發佈後的補充：`agents` 打錯 id 會長出「幽靈 primary agent」（缺陷 AI）
+
+使用者問「`agents.<id>.model` 填錯會怎樣」，我沒有憑印象回答，而是用暫存專案實測：
+
+```jsonc
+// .opencode/opencode.json
+{ "agents": { "frontend-devkit/reviewr": { "model": "opencode-go/deepseek-v4.1-flash" } } }
+```
+
+```
+$ opencode --standalone debug agents
+frontend-devkit/reviewer   (mode=subagent)   ← 真正的（未受影響，仍繼承 session model）
+frontend-devkit/reviewr    (mode=primary)    ← 幽靈
+```
+
+幽靈 agent 的實際設定：
+
+```json
+{ "id": "frontend-devkit/reviewr", "mode": "primary", "hidden": false,
+  "permissions": [ { "action": "*", "resource": "*", "effect": "allow" } ] }
+```
+
+### 兩個後果
+
+1. **你以為設了，其實沒設**：拼錯的鍵對不到真正的 agent，`reviewer` 仍繼承 session model。
+2. **多出一個全開的 primary agent**：無 system prompt、權限 `*/* allow`、**在 agent 清單可見**。任何人選到它就等於在跑不受限的 agent——比「設定沒生效」危險得多。
+
+修法（已落地）：
+1. `setup.md` §2 第 3 點：寫入前檢查 `agents` 的鍵只准那四個；其他鍵 → **不寫入並警告**（附上實測後果）。
+2. `setup.md` §5 第 1 點：`inspect` 檢查同一件事，列**嚴重**。
+3. `setup.md` allow 清單新增 `opencode debug agents`（唯讀），讓檢查有機械依據。
+4. 主檔 §7.4 寫入同一條規則與實測數據。
+5. `README.md` 與 `docs/adding-a-project.md` 的疑難排解各加一列。
+
+## 補記：縮排檢查只抓「頂格」，抓不到「四格」（缺陷 AJ）
+
+寫入上述規則時，我把 `opencode --version` 那一行弄成 **4 個空白**（其他都是 2 個）。`check-structure.ps1` 只看「頂格」，所以回報 `頂格規則=0` 一切正常；直到用 `opencode --standalone debug agents` 實測，才發現 `setup.md` 仍被 `reason=markdown` 跳過。
+
+修法：
+1. 縮排修正為 2 個空白。
+2. `check-structure.ps1` 新增 `縮排異常` 欄位（規則行不是「剛好兩個空白」就 FAIL）。
+3. **驗收方式升級**：不再只靠 regex 檢查，改用真正的載入器——
+
+   ```powershell
+   opencode --standalone debug agents   # 在裝好 kit 的目錄跑
+   ```
+
+   四個 agent 都出現（`developer`＝subagent、`orchestrator`＝primary、`reviewer`／`setup`＝all）才算通過。實測已通過。
+
