@@ -640,3 +640,13 @@ app-a 工作區：只有 ?? .opencode/（App.vue 無 v-html）
 
 修法：驗收／操作文件一律寫「**重啟 TUI 進程**」而不是「開新 session／新 tab」；並在 `tui-run-checklist.md` 的開頭註明這條。
 
+## 步驟 11「舊 `/dev` 抽測」的豁免決定
+
+`docs/implementation-plan.md` 步驟 11 原本要求「用舊 `/dev` 抽測一次流程可跑」。**這一項刻意不做**，理由如下：
+
+1. **零影響的定義是「不碰它」**。舊 `/dev` 一跑就會建 worktree、改檔，必要時還會 commit——等於為了驗證「沒有破壞」而先去破壞一次。
+2. **可驗的部分已用唯讀方式做完**：`TOS_Frontend_Fia` 的 `git status --short` 為空、`git diff --stat -- .opencode/` 為空、`.opencode/` 四個 agent 檔的 mtime 停在 **11/04**（早於這輪 11/11–13 的全部工作）。
+3. **「舊流程還能不能跑」不是這次的風險來源**：這輪完全沒有安裝／覆寫全域設定，也沒有改動 `TOS_Frontend_Fia/.opencode/` 的任何位元組；舊 agent 的定義檔沒有被任何操作讀寫過。
+
+因此把步驟 11 的驗收改為「唯讀證據」，並在此記錄豁免。若日後真的要驗舊流程，應在**複製出來的專案**上跑，而不是在正式專案。
+
