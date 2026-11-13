@@ -76,7 +76,7 @@
 只能寫成「**具體檔案＋具體規則＋理由**」三件套，例如：
 
 ```text
-src/components/ChatBox.vue：vue/no-v-html（既有 warning，短期內不改；檔案已列入 § 既有危險點）
+src/components/Example.vue：vue/no-v-html（既有 warning，短期內不改；檔案已列入 § 既有危險點）
 ```
 
 **不接受**「所有 lint error 皆豁免」這種總括式寫法——`inspect` 會標超限。

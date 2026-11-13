@@ -38,9 +38,9 @@
 
 | 嘗試 | shell 的 `Get-Location` 結果 | 判讀 |
 |---|---|---|
-| 共用 service＋`opencode run`（工作目錄設 app-a） | `TOS_Frontend`（另一個真實專案） | shell 落點不等於呼叫端 cwd |
-| `--standalone`（工作目錄 app-a 或 r1-probe） | 同上（`TOS_Frontend`） | 沒有改用私服務綁定的目錄 |
-| 在 app-a 起 `opencode serve --port 29401`，再 `opencode run --server http://127.0.0.1:29401`（密碼走 `OPENCODE_SERVER_PASSWORD`，連線成功、agent 正常回應） | **`TOS_Frontend_Fia`（這個對話的專案）** | `--server` 也沒改落點；shell 跟著 service 註冊的 location 走 |
+| 共用 service＋`opencode run`（工作目錄設 app-a） | 既有專案（另一個真實專案） | shell 落點不等於呼叫端 cwd |
+| `--standalone`（工作目錄 app-a 或 r1-probe） | 同上（既有專案） | 沒有改用私服務綁定的目錄 |
+| 在 app-a 起 `opencode serve --port 29401`，再 `opencode run --server http://127.0.0.1:29401`（密碼走 `OPENCODE_SERVER_PASSWORD`，連線成功、agent 正常回應） | **`既有專案 A`（這個對話的專案）** | `--server` 也沒改落點；shell 跟著 service 註冊的 location 走 |
 
 **結論**：`opencode` 的 shell 工具在 **service 綁定的 location** 執行，`--server`／`--standalone` 與呼叫端 cwd 都改變不了它。因此關卡 2～7 若由我自動驅動，agent 會去改**你正在用的專案**，這不可接受 → 我停在這裡，沒有讓它寫任何東西到 app-a 之外（本節所有測試都是唯讀或權限被拒）。
 
@@ -645,8 +645,8 @@ app-a 工作區：只有 ?? .opencode/（App.vue 無 v-html）
 `docs/implementation-plan.md` 步驟 11 原本要求「用舊 `/dev` 抽測一次流程可跑」。**這一項刻意不做**，理由如下：
 
 1. **零影響的定義是「不碰它」**。舊 `/dev` 一跑就會建 worktree、改檔，必要時還會 commit——等於為了驗證「沒有破壞」而先去破壞一次。
-2. **可驗的部分已用唯讀方式做完**：`TOS_Frontend_Fia` 的 `git status --short` 為空、`git diff --stat -- .opencode/` 為空、`.opencode/` 四個 agent 檔的 mtime 停在 **11/04**（早於這輪 11/11–13 的全部工作）。
-3. **「舊流程還能不能跑」不是這次的風險來源**：這輪完全沒有安裝／覆寫全域設定，也沒有改動 `TOS_Frontend_Fia/.opencode/` 的任何位元組；舊 agent 的定義檔沒有被任何操作讀寫過。
+2. **可驗的部分已用唯讀方式做完**：`既有專案 A` 的 `git status --short` 為空、`git diff --stat -- .opencode/` 為空、`.opencode/` 四個 agent 檔的 mtime 停在 **11/04**（早於這輪 11/11–13 的全部工作）。
+3. **「舊流程還能不能跑」不是這次的風險來源**：這輪完全沒有安裝／覆寫全域設定，也沒有改動 `既有專案 A/.opencode/` 的任何位元組；舊 agent 的定義檔沒有被任何操作讀寫過。
 
 因此把步驟 11 的驗收改為「唯讀證據」，並在此記錄豁免。若日後真的要驗舊流程，應在**複製出來的專案**上跑，而不是在正式專案。
 

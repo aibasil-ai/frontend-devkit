@@ -36,7 +36,7 @@ pack 是「**這類專案要檢查什麼**」的可重用知識，放在 `kit/ru
 id: stack/vue2-nuxt2
 title: Vue 2 / Nuxt 2 慣例
 status: 已驗證
-source: TOS_Frontend 現有 reviewer.md／developer.md 逐條抽出（附檔 migration-map.md 有來源對照）
+source: 既有專案現有 reviewer.md／developer.md 逐條抽出（附檔 migration-map.md 有來源對照）
 covers: options API 寫法、元件庫版本屬性誤用、目錄與載入慣例、程式風格
 ---
 ```

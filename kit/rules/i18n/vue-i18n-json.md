@@ -2,7 +2,7 @@
 id: i18n/vue-i18n-json
 title: JSON 語系檔同步（vue-i18n 型專案）
 status: 已驗證
-source: TOS_Frontend 現有 developer.md 與 reviewer.md 的 i18n 條目抽出
+source: 既有專案現有 developer.md 與 reviewer.md 的 i18n 條目抽出
 covers: 多語系檔同步、刪鍵與改名的引用追查、缺語系的用戶端徵兆、插值與複數形規則
 ---
 

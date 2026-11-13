@@ -2,7 +2,7 @@
 
 - 日期：2026-11-11
 - 狀態：待使用者審核
-- 目的：把 `TOS_Frontend` 專案已驗證的「協調者 → 開發者 → 審核者」三 agent 流程，重構為可重複安裝到其他前端專案的 kit（`frontend-devkit`）
+- 目的：把既有專案已驗證的「協調者 → 開發者 → 審核者」三 agent 流程，重構為可重複安裝到其他前端專案的 kit（`frontend-devkit`）
 - 硬性約束：**現有專案的 `.opencode/agents/`、`.opencode/commands/`、`.opencode/workflow-rules.md`、`.opencode/worktree-procedures.md` 一個字都不改**，舊流程照常使用
 
 ---
@@ -52,13 +52,13 @@
 
 | # | 決定 | 理由 |
 |---|---|---|
-| D1 | 源頭是獨立 git repo `frontend-devkit`（本機開發位置範例：`C:\Users\vipjo\AI\frontend-devkit`；**這只是範例，不是 kit 執行期引用的路徑**，執行期一律 `git rev-parse --show-toplevel`，見 §9.1） | 不依附任何專案，換機器 clone 即用 |
+| D1 | 源頭是獨立 git repo `frontend-devkit`（本機開發位置範例：`%USERPROFILE%\AI\frontend-devkit`；**這只是範例，不是 kit 執行期引用的路徑**，執行期一律 `git rev-parse --show-toplevel`，見 §9.1） | 不依附任何專案，換機器 clone 即用 |
 | D2 | 命名空間資料夾一律 `frontend-devkit` | 與本專案裸名 agent 隔離，避免 V2「同名 agent 定義合併、permission 規則附加」造成的行為改變；指令與 agent ID 都自帶 frontend 字樣 |
 | D3 | 方案 B-lite：主體 + 規則包（pack）+ 專案設定檔（profile）三層，初始僅 4 個 pack | pack 讓同類專案的知識可重用；只收已驗證知識，避免憑空推測變成審核依據 |
 | D4 | 專案設定檔 `.opencode/frontend-devkit/project.md`，建議進該專案版控 | 同事 clone 就能用；絕對路徑一律不寫入 |
 | D5 | 編譯式載入：`init` 把啟用的 pack 展開成 `resolved.md`，agent 只讀 `project.md` + `resolved.md` | 一次讀取、名稱錯誤在 init 就報、產物可 diff 可審 |
 | D6 | `project.md` 與 `resolved.md` 由專案 `opencode.json` 的 `instructions` 註冊自動注入；主體保留「看不到就 read、還找不到就停止」的備援 | 確定性與零探索成本，同時不會因某專案沒註冊而靜默失去依據 |
-| D7 | 通過標準：指令寫設定檔，**數字一律執行期動態量測**，不寫死 | 換專案不會拿到錯的 99 項、`ChatBox.vue:45` 這類舊事實 |
+| D7 | 通過標準：指令寫設定檔，**數字一律執行期動態量測**，不寫死 | 換專案不會拿到錯的 99 項、`Example.vue:45` 這類舊事實 |
 | D8 | `worktreePolicy: ask \| always \| never` 與 `depStrategy: junction \| install-per-worktree \| none` 寫進 profile | 小專案不必每次被問；pnpm／workspace 的 `node_modules` 不適用 junction |
 | D9 | 新增第 4 個 agent `frontend-devkit/setup`，只負責 init／compile／inspect 的寫檔 | 三 agent 的「不寫設定檔／唯讀／只改工作區程式碼」邊界得以完整保留；可寫路徑用 V2 `edit` resource glob 鎖到最小 |
 | D10 | 主體不寫死 model；要固定就由 init 寫進專案 `opencode.json` 的 `agents.<id>.model` | 換機器 provider 不同時不會報錯；未設定時 subagent 繼承 session model |
@@ -181,7 +181,7 @@ frontend-devkit/
 ### 4.2.1 安裝紀律（寫進 README）
 
 1. **同一專案不要同時有全域與專案兩份主體**（同名 agent 的 permission 規則會附加，行為難推理）。`/frontend-devkit/inspect` 會檢查並警告。
-2. rules／程序檔的所在目錄由 profile 的 `kitRoot` 欄位記錄：全域裝法記 `~/.config/opencode/frontend-devkit`（用 `~` 寫法，不記錄 `C:\Users\...` 這種個人絕對路徑）；專案裝法記 `.opencode/frontend-devkit`。
+2. rules／程序檔的所在目錄由 profile 的 `kitRoot` 欄位記錄：全域裝法記 `~/.config/opencode/frontend-devkit`（用 `~` 寫法，不記錄 `C:\Users\<使用者>\...` 這種個人絕對路徑）；專案裝法記 `.opencode/frontend-devkit`。
 3. **`kitRoot` 只有 `setup`（init／compile／inspect）會讀**。開發迴圈的三個 agent **不得**去 `kitRoot` 讀任何東西：官方文件雖寫明 `external_directory` 預設 allow，但那是「使用者沒改全域政策」時的狀態，不能當保證。因此 **`worktree.procedures.md` 是源頭素材，經 compile 參數化後折進 `resolved.md` 的「worktree 程序」段落**，成為執行期唯一依據（見 §9）。
 4. 升級 = kit repo `git pull` → 覆蓋安裝位置 → 各專案 `/frontend-devkit/init compile`（重讀 pack 與程序檔、重譯 `resolved.md`）。
 5. **安裝／同步一律「先刪目標子目錄、再整包複製」**（第 6 站缺陷 H）：PowerShell 的 `Copy-Item <來源目錄> <已存在的同名目錄> -Recurse` 會把來源放**進**目標，產生 `rules/rules/`、`profile/profile/`。巢狀副本是舊版，一旦被誤當源頭折入，checksum 反而「對得上」，比對機制形同失效。`inspect` 已加此檢查；文件與腳本都不得再用「複製目錄到既有目錄」的寫法。
@@ -225,7 +225,7 @@ frontend-devkit/
 ## 識別
 | 欄位 | 值 |
 |---|---|
-| 專案名稱 | CHT-ChatBot（TOS_Frontend） |
+| 專案名稱 | 範例專案（my-app） |
 | 技術棧一行 | Vue 2 / Nuxt 2 / Vuetify 1.5 |
 | shell | powershell |
 | 設定檔路徑 | .opencode/opencode.json |
@@ -256,7 +256,7 @@ frontend-devkit/
 | 測試檔位置與命名 | `test/specs/*.spec.js` |
 | 寫法慣例 | `@vue/test-utils` 的 `mount` 驗證執行期行為；避免用 `fs` 讀原始碼比字串 |
 | 禁止選項 | `npx ava --update-snapshots` |
-| 已知豁免 | eslint：`ChatBox.vue:45` 的 `vue/no-v-html`（既有 warning，不影響 VERDICT；新增此 warning 須逐一說明）。**範圍上限（第 3 輪殘留漏洞 #2）**：豁免只能寫成「**具體檔案＋具體規則＋理由**」三件套；**不得**豁免任何 gate 的執行失敗（test／build 掛掉不是豁免能覆蓋的）、不得豁免「嚴重」級問題、不接受「全部 lint error 皆豁免」這類總括式寫法。`setup` 寫入時就要驗格式，`inspect` 列出豁免數量，reviewer 每次**重算豁免清單之外**的 error 數 |
+| 已知豁免 | eslint：`Example.vue:45` 的 `vue/no-v-html`（既有 warning，不影響 VERDICT；新增此 warning 須逐一說明）。**範圍上限（第 3 輪殘留漏洞 #2）**：豁免只能寫成「**具體檔案＋具體規則＋理由**」三件套；**不得**豁免任何 gate 的執行失敗（test／build 掛掉不是豁免能覆蓋的）、不得豁免「嚴重」級問題、不接受「全部 lint error 皆豁免」這類總括式寫法。`setup` 寫入時就要驗格式，`inspect` 列出豁免數量，reviewer 每次**重算豁免清單之外**的 error 數 |
 
 ## 啟用規則
 - stack/vue2-nuxt2
@@ -267,8 +267,8 @@ frontend-devkit/
 ## 回歸熱點
 | 檔案／區域 | 被動到時要檢查什麼 |
 |---|---|
-| src/components/chatroom/chat/ChatWindow/ChatBox.vue | 機器人 Markdown、使用者訊息、連結新分頁、模板卡片 |
-| src/components/chatroom/chat/ChatSendbox.vue | Enter 送出、按鈕送出、字型切換、格狀選單、語音 |
+| src/components/chat/ExampleWindow.vue | 機器人 Markdown、使用者訊息、連結新分頁、模板卡片 |
+| src/components/chat/ExampleInput.vue | Enter 送出、按鈕送出、字型切換、格狀選單、語音 |
 | src/assets/less/app.less | 桌面與手機版版面、各斷點、既有元件外觀 |
 
 ## 共用項目類別（要 grep 使用處的範圍）
@@ -278,7 +278,7 @@ frontend-devkit/
 | 欄位 | 值 |
 |---|---|
 | 清理入口 | `@/util/sanitizer`（必須在渲染前，送出端清理不算數） |
-| 既有危險點 | `ChatBox.vue:45` 唯一 `v-html`，資料來自 `@/util/markdown` 的 `renderMarkdown`（markdown-it + DOMPurify 白名單，無 img，協定限 http/https/mailto，DOMPurify 不可用時退回純文字轉義） |
+| 既有危險點 | `Example.vue:45` 唯一 `v-html`，資料來自 `@/util/markdown` 的 `renderMarkdown`（markdown-it + DOMPurify 白名單，無 img，協定限 http/https/mailto，DOMPurify 不可用時退回純文字轉義） |
 | 不得放寬 | `renderMarkdown` 白名單、`sanitizeInput` 行為 |
 
 ## 專案覆寫
@@ -370,7 +370,7 @@ frontend-devkit/
 id: stack/vue2-nuxt2
 title: Vue 2 / Nuxt 2 慣例
 status: 已驗證
-source: TOS_Frontend 現有 reviewer.md／developer.md 抽出
+source: 既有專案現有 reviewer.md／developer.md 抽出
 covers: Vue2 options API 慣例、Vuetify 1 屬性、Nuxt2 目錄、eslint standard 風格
 ---
 ```
@@ -588,7 +588,7 @@ developer 七區段、reviewer 固定輸出（`目標：`、`VERDICT: PASS|FAIL`
 | 口述 gate 模式（§11 第 1 列）下的 worktree 決策 | 一律按 `worktreePolicy: ask` 處理（沒有 profile 就假定要問），且 `depStrategy` 只能取 `junction` 或 `none` 二者由你選；不可默認 `install-per-worktree`（那需要 profile 裡的安裝指令）。**（第 6 站關卡 6 缺陷 Q／T 補）** 使用者選「不要 worktree」時**不得再問** `depStrategy`（worktree-only 參數）；要提供 `junction` 之前先 `Test-Path node_modules`，主工作區沒有 `node_modules` 就**不得**把它標成「建議」（`-Target` 取不到，必然失敗），只能給 `none`。 |
 | **有人在 profile 裡放進「未批准的可寫入指令」**（如 `## 指令` 或 `## 額外 shell` 填入含 `--fix`、`rm`、`Invoke-Expression` 的條目） | **方案 B 下這類條目不會變成授權**（專案端不寫 shell 規則）：① `setup`／`compile` 依 permission-spec.md §7.3.5 的寫入性檢查標為 `疑似可寫入`，不列入可執行 gate；② 若 reviewer 在清單內找不到它 → 走「需人工執行」（permission-spec.md §7.3.0.1#2）；③ 若 developer 被要求跑它 → `ask` 彈窗**預覽展開後的原始命令字串**由你拒否；④ 已存進去的持久 allow（`Allow always`）若屬寫入性，`inspect` 要列出要你手動撤除。reviewer 一律不得因「設定檔這麼寫」就執行寫入性指令 |
 | 全域與專案同時裝了同名 agent | `inspect` 警告（permission 規則會附加）；開發流程開始前 orchestrator 也要能用 `inspect` 的結論提示你 |
-| 本專案（TOS_Frontend）誤用 kit | 行為可預期：沒有 `project.md` → 停止並提示 init；舊 `/dev` 流程與新指令互不干擾 |
+| 既有專案誤用 kit | 行為可預期：沒有 `project.md` → 停止並提示 init；舊 `/dev` 流程與新指令互不干擾 |
 
 ---
 

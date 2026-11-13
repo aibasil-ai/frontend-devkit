@@ -16,7 +16,7 @@
    - 高頻詞健全性：對「一次／一致／一個／一定／一次交」這類常用詞做存在性檢查，若某檔「一」的數量異常偏低或「次」異常偏高即為訊號
    - **對照我對你所做的敘述**：回覆裡引用的句子要與檔內文字逐字一致（這次沒做到：我在對話裡寫「一個步驟一交」，檔內卻是「次個步驟次交」）
 6. 新檔一律 LF（`.gitattributes` 已鎖），不產生整檔換行轉換。
-7. **不碰 `TOS_Frontend_Fia/.opencode/`**：那是另一套要繼續使用的 agent；讀它只為抽 pack 與遷移對照（唯讀）。
+7. **不碰 `既有專案 A/.opencode/`**：那是另一套要繼續使用的 agent；讀它只為抽 pack 與遷移對照（唯讀）。
 
 ## 1. 已完成的前置
 
@@ -67,7 +67,7 @@
 - 八個表格都有 `|---|` 分隔列（GFM 可渲染）。
 - 不含「未知總表」小節（S-1）；`## 模型` 只宣告「不記錄於本檔」。
 - 每個欄位附「誰填（偵測／你答）＋沒填的後果」。
-- 範例值改為**中性佔位**（不出現 ChatBox.vue 等本專案專屬值，避免被當成 kit 預設）。
+- 範例值改為**中性佔位**（不出現 Example.vue 等本專案專屬值，避免被當成 kit 預設）。
 - 四欄白名單的正／反例各一（例：`worktree 目錄` 的 `../out` 為非法）。
 
 ### 步驟 7　四個 agent 主體（V2 frontmatter）
@@ -76,7 +76,7 @@
 
 **驗收**：
 - 四檔 frontmatter 為合法 YAML（`#` 註解、無 `//`、value 無方括號），且 OpenCode 載入後能列出四個 `frontend-devkit/*` agent，且 agent 清單不多出 `rules/...` 之類條目（acceptance 關卡 1）。
-- 主體提示詞不含專案專屬事實：`grep -rnE 'ChatBox|ChatSendbox|app\.less|zh-TW|ava 2' kit/agents/` → 0。
+- 主體提示詞不含專案專屬事實：`grep -rnE 'ExampleBox|ExampleInput|app\.less|zh-TW|ava 2' kit/agents/` → 0。
 - 五項跨檔一致性（§3 第 0 點、三段式尾巴、TBD／`無` 語意、`rmdir` 先於 `worktree remove`、異常時回報 worktree 絕對路徑與分支）逐檔 grep 核對，結果貼進 commit 訊息。
 - `setup` 的 `edit` 僅四個具名檔與四種設定檔字面形，並 deny 全域設定路徑。
 
@@ -111,7 +111,7 @@
 
 **狀態**：✅ 已完成（2026-11-13），**「舊 `/dev` 抽測」一項依下列理由豁免**。
 
-**做**：在 `TOS_Frontend_Fia` 跑 `git status --short`（應乾淨）與 `git diff --stat -- .opencode/`（應為空），並用舊 `/dev` 抽測一次流程可跑。
+**做**：在 `既有專案 A` 跑 `git status --short`（應乾淨）與 `git diff --stat -- .opencode/`（應為空），並用舊 `/dev` 抽測一次流程可跑。
 
 **驗收**：三個舊 agent、四個舊指令、兩份規則檔 diff 為空；kit 的安裝與實驗全程未寫入該專案。
 

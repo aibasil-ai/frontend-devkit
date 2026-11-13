@@ -99,7 +99,7 @@ kit 已把修補同步進 app-a／app-b（`setup.md` 現含 `opencode --version`
 
 ## 關卡 8　零影響
 
-我在 `C:\Users\vipjo\AI\frontend-devkit` 與 `frontend-devkit-eval` 之外不寫任何东西；本關我自查 `TOS_Frontend_Fia` 的 `git status --short`（應乾淨）與 `.opencode/` diff（應為空）。你不用做。
+我在 `%USERPROFILE%\AI\frontend-devkit` 與 `frontend-devkit-eval` 之外不寫任何東西；本關我自查 `既有專案 A` 的 `git status --short`（應乾淨）與 `.opencode/` diff（應為空）。你不用做。
 
 ## 要貼回給我的東西
 

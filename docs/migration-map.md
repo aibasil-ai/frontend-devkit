@@ -9,8 +9,8 @@
 | 現有位置 | -kit 的去處 |
 |---|---|
 | orchestrator.md 第 60 行主工作區絕對路徑 | 刪除，改執行期 `git rev-parse --show-toplevel`（§9.1） |
-| 三 agent 開頭「TOS_Frontend（Nuxt 2／Vue 2／Vuetify 1.5／Node v12）」 | profile `## 識別` 技術棧一行 |
-| 「99 項全數通過」「0 error／1 warning」等數字 | 刪除，改動態量測（D7）；`ChatBox.vue:45` warning 進 profile `## 測試慣例` 的已知豁免 |
+| 三 agent 開頭「既有專案（Nuxt 2／Vue 2／Vuetify 1.5／Node v12）」 | profile `## 識別` 技術棧一行 |
+| 「99 項全數通過」「0 error／1 warning」等數字 | 刪除，改動態量測（D7）；`Example.vue:45` warning 進 profile `## 測試慣例` 的已知豁免 |
 | `npm test`／`npx eslint`／`npm run build`／`npm ci` 指令與 timeout | profile `## 指令`；專案端 `opencode.json` 的 allow 規則（permission-spec.md §7.3） |
 | developer.md 專案慣例（Vue2/Vuetify1/eslint standard） | pack `stack/vue2-nuxt2` |
 | developer.md 特徵測試寫法（ava、`@vue/test-utils`、禁 `fs` 比字串） | pack `testing/ava` |

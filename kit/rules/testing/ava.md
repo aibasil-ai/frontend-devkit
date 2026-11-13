@@ -2,7 +2,7 @@
 id: testing/ava
 title: ava 測試與特徵測試寫法
 status: 已驗證
-source: TOS_Frontend 現有 developer.md（特徵測試節）與 reviewer.md（測試與回歸檢驗節）逐條抽出
+source: 既有專案現有 developer.md（特徵測試節）與 reviewer.md（測試與回歸檢驗節）逐條抽出
 covers: 特徵測試時機與順序、斷言不可削弱、執行期行為優先、快照類旗標的風險、測試是否真的在驗行為
 ---
 

@@ -256,7 +256,7 @@
 | `docs/CHANGELOG.md` | 附錄 A＝原 §16；附錄 B＝原 §17.1～17.12（本節） | 歷史脈絡，**非實作依據** |
 | `docs/experiments.md`（第 6 站前已存在） | R1 八題實測 | 質疑權限結論時的原始數據 |
 
-主檔保留 §1–§11、§14、§15，並在頂端新增「**0. 檔案地圖**」；§7.3／§12／§13／§16／§17 在原位留 stub 維持編號不斷裂，全文 `§` 引用已加檔名前綴（拆檔後跑過一次引用比對，主檔殘留未加前綴的已外移引用為 0）。拆檔用的腳本與一次性 `polish-pass*.ps1` **已刪除**，`tools/` 只留 `normalize-forms.ps1`、`scan-forms.ps1` 與說明其非 kit 身份的 `tools/README.md`；探測專案 `C:\Users\vipjo\AI\r1-probe` 已整包刪除（全域設定先前已驗證與備份雜湊一致）。
+主檔保留 §1–§11、§14、§15，並在頂端新增「**0. 檔案地圖**」；§7.3／§12／§13／§16／§17 在原位留 stub 維持編號不斷裂，全文 `§` 引用已加檔名前綴（拆檔後跑過一次引用比對，主檔殘留未加前綴的已外移引用為 0）。拆檔用的腳本與一次性 `polish-pass*.ps1` **已刪除**，`tools/` 只留 `normalize-forms.ps1`、`scan-forms.ps1` 與說明其非 kit 身份的 `tools/README.md`；探測專案 `%USERPROFILE%\AI\r1-probe` 已整包刪除（全域設定先前已驗證與備份雜湊一致）。
 
 **17.12 那張「未修清單」的結案狀態**（逐條，不籠統宣稱已修）：
 
@@ -288,7 +288,7 @@
 | pack 內無完整指令列／timeout／項數／專案路徑（grep `npm \|pnpm \|npx \|timeout\|--fix\|99 項\|src/\|\.vue\|\.js`） | **0 命中** |
 | 四個 pack 檔頭 `id`／`status`（`已驗證`）／`covers` 齊備 | 4/4 通過 |
 | 模板表格分隔列：表頭數 10、`|---` 分隔列數 10 | 每表都有，無缺 |
-| kit 素材內無個人絕對路徑（grep `C:`、`Users\vipjo`） | **0**（原有一處是「非法範例」欄位的 `C:\…`，已改為 `<盤符>:\…` 以免與檢查互相干擾） |
+| kit 素材內無個人絕對路徑（grep `C:`、`Users\<使用者>`） | **0**（原有一處是「非法範例」欄位的 `C:\…`，已改為 `<盤符>:\…` 以免與檢查互相干擾） |
 | 簡體專屬字形掃描（`tools/scan-forms.ps1` 的字集約 50 字，皆為繁體不用的簡體形） | **0 命中** ✓ |
 | 「一」/「次」數量比對（9 個新檔） | 「次」全部來自合法詞（一次、每次、首次、上次、該次、前次、兩次、二次確認），無「一→次」毀損 |
 
@@ -330,6 +330,6 @@
 | 7 | reviewer 跑 `npm testxyz` | **DENIED** ✓ → `"npm test *"` 不會誤放 `npm testxyz`，§7.3.2 的「用 ` *` 形、不用 `test*`」有實質效果 |
 | 8 | reviewer 跑 `Get-FileHash tools/scan-forms.ps1` | **DENIED** ✓ → 第 3 輪 S5 的修法落地：checksum 驗算只屬 `setup`／`compile`，reviewer 沒拿到該權限 |
 
-**副作用查核**：第 5、6 條的 `rmdir`／`Test-Path` 目標都是不存在的名字（`review-zzz`），不會刪到東西；`git status` 為唯讀。被 service 綁定的那個真實專案（`TOS_Frontend`）的 `.worktrees\feature-font-size-toggle`（2026/11/6）與兩個未 commit 檔案（mtime 2026/11/4）**保持原狀**，未受本次測試影響。
+**副作用查核**：第 5、6 條的 `rmdir`／`Test-Path` 目標都是不存在的名字（`review-zzz`），不會刪到東西；`git status` 為唯讀。被 service 綁定的那個真實專案（既有專案）的 `.worktrees\feature-font-size-toggle`（2026/11/6）與兩個未 commit 檔案（mtime 2026/11/4）**保持原狀**，未受本次測試影響。
 
 **仍然未驗的**：六個指令檔的**斜線指令展開**（`/frontend-devkit/dev` 這類）需要在 TUI 或互動式 session 裡按出來看清單，headless 只驗證了 agent 端；另外 `init`／`compile`／`inspect` 的實際行為要等關卡 2（需要一個裝好 kit 的試寫專案）才算數。這兩項都留給 `acceptance.md` 的關卡處理，不在這裡宣稱通過。

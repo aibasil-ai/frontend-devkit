@@ -2,7 +2,7 @@
 id: security/vue-xss
 title: Vue 專案的 XSS 細項檢查法
 status: 已驗證
-source: TOS_Frontend 現有 reviewer.md（XSS 與安全性節）與 developer.md（專案慣例節）逐條抽出
+source: 既有專案現有 reviewer.md（XSS 與安全性節）與 developer.md（專案慣例節）逐條抽出
 covers: 模板內插入原始 HTML 的來源回溯、清理器白名單的審視要點、渲染前才算數的判定、動態協定與跳轉
 ---
 

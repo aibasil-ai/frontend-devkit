@@ -22,7 +22,7 @@ foreach ($a in Get-ChildItem 'kit\agents\frontend-devkit' -File) {
 }
 
 Write-Output '=== 2. 主體是否混入專案專屬事實（應全為 0）==='
-foreach ($p in 'ChatBox', 'ChatSendbox', 'app\.less', 'zh-TW', 'ava 2', 'Vuetify', 'en\.json') {
+foreach ($p in 'ExampleBox', 'ExampleInput', 'app\.less', 'zh-TW', 'ava 2', 'Vuetify', 'en\.json') {
   $n = 0
   foreach ($f in Get-ChildItem 'kit\agents\frontend-devkit' -File) {
     $n += @(Select-String -Path $f.FullName -Pattern $p -Encoding utf8).Count

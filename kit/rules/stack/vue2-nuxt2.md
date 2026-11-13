@@ -2,7 +2,7 @@
 id: stack/vue2-nuxt2
 title: Vue 2 / Nuxt 2 / Vuetify 1 慣例
 status: 已驗證
-source: TOS_Frontend 現有 reviewer.md（慣例審查節）與 developer.md（專案慣例節）逐條抽出，來源對照見 docs/migration-map.md
+source: 既有專案現有 reviewer.md（慣例審查節）與 developer.md（專案慣例節）逐條抽出，來源對照見 docs/migration-map.md
 covers: options API 寫法、元件庫版本屬性誤用、Nuxt 2 目錄與載入慣例、程式風格與命名
 ---
 

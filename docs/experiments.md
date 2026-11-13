@@ -1,6 +1,6 @@
 # R1 實測結果（2026-11-11，OpenCode v2.2.7／Windows／PowerShell）
 
-實驗場：`C:\Users\vipjo\AI\r1-probe`（探測專案）＋暫放全域的三個探測 agent（`agents/r1probe/probeA|B|C`，跑完已刪除；全域 `opencode.json` 已自備份還原）。
+實驗場：`%USERPROFILE%\AI\r1-probe`（探測專案）＋暫放全域的三個探測 agent（`agents/r1probe/probeA|B|C`，跑完已刪除；全域 `opencode.json` 已自備份還原）。
 手法：agent 的 `permissions` 用**不存在的假指令**（`zzstatus`／`zzpkg`／`zzmd`／`zzjson`／`zzbad`）做地板 deny＋窄域 allow，再命它「照原字串執行」；**有送到 shell（即使回「無法辨識指令」）＝EXECUTED＝allow 生效**，被權限擋＝DENIED。假指令不會真的執行任何事，所以零副作用。
 
 ## 一、逐題結果
@@ -21,12 +21,12 @@
 
 ## 二、方法學警告（實作時必須知道）
 
-1. **`opencode run` 的 shell 是在 service 綁定的專案目錄執行，不是呼叫端的 cwd**。本次即便我把 workdir 指到探測專案、也用 `--standalone`，`Get-Location` 仍回傳另一個專案（`TOS_Frontend`）的路徑。
+1. **`opencode run` 的 shell 是在 service 綁定的專案目錄執行，不是呼叫端的 cwd**。本次即便我把 workdir 指到探測專案、也用 `--standalone`，`Get-Location` 仍回傳另一個專案（既有專案）的路徑。
    → 影響：任何「相對路徑」實驗要**先驗證實際落點**（用 `Get-Location` 當第一條）；涉及寫檔的實驗一律用**絕對路徑**。
    → 已查核：該專案的兩個未 commit 檔案（`.gitignore`、`src/data/settings/development.js`）mtime 為 2026-11-04，非本次實驗造成；實驗用的假指令與 `rmdir`（不存在的目錄）未對其產生任何寫入。
 2. 專案本地 `.opencode/agents/*.md** 的 agent 在本次環境**無法被 `opencode run --agent` 找到**（同目錄、同格式的全域 agent 找得到；`--standalone`、根/`.opencode` 兩種 config 都試過）。這是**工具鏈限制**，不是 kit 的設計問題，但它擋死了「用專案端 config 追加 allow」這條驗證路——也正好是第 3 題用全域安裝形態測出「方案 A 不通過」的背景。
    → 待辦：實作階段要用**真實前端專案＋TUI 手動安裝**再驗一次第 3 題（若專案端 config 的 allow 在 TUI 形態下生效，方案 A 仍可保留為選項）。在此之前，kit 預設方案 B。
-3. 實驗用完的暫放檔案已清理：`~/.config/opencode/agents/r1probe/` 刪除、`~/.config/opencode/opencode.json` 自備份還原（`agents` 鍵已消失）。備份留在 `C:\Users\vipjo\AI\r1-probe\global-opencode.json.bak`；探測專案 `C:\Users\vipjo\AI\r1-probe` 可整包刪。
+3. 實驗用完的暫放檔案已清理：`~/.config/opencode/agents/r1probe/` 刪除、`~/.config/opencode/opencode.json` 自備份還原（`agents` 鍵已消失）。備份留在 `%USERPROFILE%\AI\r1-probe\global-opencode.json.bak`；探測專案 `%USERPROFILE%\AI\r1-probe` 可整包刪。
 
 ## 三、spec 需要的五個定稿動作（本檔的行動清單）
 
