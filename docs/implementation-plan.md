@@ -92,6 +92,8 @@
 
 ### 步驟 9　README 與安裝／上手文件
 
+**狀態**：✅ 已完成（2026-11-13）——`README.md`、`docs/install.md`、`docs/adding-a-project.md` 三份；三條告警、字面同形、方案 A 三步先決、`init` 問答範例、四欄白名單、TBD 補法均已寫入。
+
 **做**：`README.md`、`docs/install.md`（兩種裝法、升級步驟、`kitRoot`、重複安裝警告、`opencode run` 落點注意）、`docs/adding-a-project.md`（init 問答範例、四欄白名單怎麼填、TBD 怎麼補）。
 
 **驗收**：三條告警齊備（①升級後各專案重跑 `init compile`；②不要用內建 `build` 跑 kit 任務；③任何 agent 都不准動 `.git/`，hook 需求由你在專案外處理）。`install.md` 記錄「shell 比對用原始字串、字面同形」與「方案 A 覆驗的三步先決」。
