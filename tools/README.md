@@ -5,9 +5,14 @@
 | 腳本 | 用途 | 什麼時候跑 |
 |---|---|---|
 | `normalize-forms.ps1` | 確定詞的簡→繁替換；漢字黏 `reviewer`／`developer`／`orchestrator`／`setup` 時補空格；表格 `\|` 後直接接檔名時補空格 | 大量寫文件後；**跑完必須人工重讀被改動的行** |
+| `normalize-forms.mjs` | 同上（Node 版，零依賴）；寫檔 UTF-8 無 BOM、LF | 同上 |
 | `scan-forms.ps1` | 唯讀掃描：簡體專屬字形命中、各檔「一／次」數量 | 每次 commit 前（數量異常＝字元毀損訊號） |
+| `scan-forms.mjs` | 同上（Node 版，零依賴） | 同上 |
 | `check-structure.ps1` | 四個 agent 的 frontmatter 規則格式、主體是否混入專案專屬事實、六個指令檔紀律、尾巴三段式的相對次序（不可變 allow 必須在可變 deny 之後） | M2／M3 驗收（`acceptance.md` 關卡 1 之前先跑這支） |
+| `check-structure.mjs` | 同上（Node 版，零依賴）＋ POSIX allow 條目（`ln -s`／`unlink`／`pwd -P`）須在尾巴第 1 段 deny 之前的檢查 | 同上 |
 | `polish-pass*.ps1` | 已刪除。歷次一次性修正腳本，任務完成即清，避免堆成「沒人知道能不能刪」的垃圾 | — |
+
+> **Node 版與 PS1 版等價**（Node 版以 PS1 為規格逐條移植）：macOS 用 `node tools/*.mjs`，Windows 可續用 `.ps1`，兩版檢查結果應一致；`check-structure.mjs` 額外多一項 POSIX allow 條目位置檢查（PS1 版維持原狀）。
 
 ## 寫腳本時的三條紀律（都是踩過出來的）
 

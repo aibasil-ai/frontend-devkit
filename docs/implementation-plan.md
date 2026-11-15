@@ -5,6 +5,8 @@
 - 狀態：待使用者審核（未經同意不開始實作、不 commit）
 - 產物性質：kit 是**純 markdown 元件**（四個 agent、六個指令、四個 pack、profile 範本、worktree 程序檔）＋安裝文件。**不新增 npm 依賴、不附執行腳本**（`tools/` 的字形工具與 kit 無關）
 
+> **註記（2026-11-14）**：此為 2026-11-12 Windows-only 的**歷史計畫**；雙平台（Windows＋macOS）實作見 `docs/plans/2026-11-14-macos-compatibility-plan.md`（設計：`docs/specs/2026-11-14-macos-compatibility-design.md`）。
+
 ## 0. 全程適用的紀律（每條都對應到一次實際失誤）
 
 1. **每步一個 commit**，訊息先給你審；一律不 push。

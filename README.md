@@ -13,9 +13,13 @@
 
 | 項目 | 要求 |
 |---|---|
-| 平台 | **Windows + PowerShell**（worktree 程序只有 PowerShell 版；非 Windows 會拒絕執行） |
+| 平台 | **Windows PowerShell 或 macOS zsh／bash**（profile `shell` 值域：`powershell`／`posix`；**本次只驗 macOS**、Linux 未驗不宣稱支援） |
 | OpenCode | 實測 `v2.2.7`（`opencode --version`） |
 | 專案 | 是 git repo，且 `.gitignore` 含 `.worktrees/` |
+
+> `depStrategy: junction` 的平台語意：Windows＝junction（兩步 `Resolve-Path`＋`New-Item`）、macOS＝固定相對 symlink `../../node_modules`（P4）。`shell` 的偵測：先 `uname -s`（`Darwin`／`Linux` → `posix`）、後 `Get-Location`（→ `powershell`），兩者皆敗 → `TBD（未確認）`。
+>
+> **P11 breaking change（2026-11-14）**：`worktree 目錄` 唯一合法值 `.worktrees/`、審核前綴唯一合法值 `review-`；其他值 `init`／`inspect` 一律拒絕並指明合法值。
 
 ## 安裝（專案層，建議）
 
@@ -30,6 +34,23 @@
    | `kit/rules/` | `.opencode/frontend-devkit/rules/` |
    | `kit/profile/` | `.opencode/frontend-devkit/profile/` |
    | `kit/worktree.procedures.md` | `.opencode/frontend-devkit/worktree.procedures.md` |
+
+   macOS（zsh／bash）：
+
+   ```bash
+   KIT="kit"
+   DST="<你的專案>/.opencode"
+   # 先刪目標子目錄再整包複製（巢狀警告：cp -R 到已存在的同名目錄會把來源放進去）
+   rm -rf "$DST/agents/frontend-devkit" "$DST/commands/frontend-devkit" "$DST/frontend-devkit/rules" "$DST/frontend-devkit/profile"
+   mkdir -p "$DST/agents/frontend-devkit" "$DST/commands/frontend-devkit" "$DST/frontend-devkit"
+   cp -R "$KIT/agents/frontend-devkit" "$DST/agents/"
+   cp -R "$KIT/commands/frontend-devkit" "$DST/commands/"
+   cp -R "$KIT/rules" "$DST/frontend-devkit/"
+   cp -R "$KIT/profile" "$DST/frontend-devkit/"
+   cp "$KIT/worktree.procedures.md" "$DST/frontend-devkit/"
+   ```
+
+   Windows 指令見 [`docs/install.md`](docs/install.md) §1a。
 
 2. **重啟 TUI 進程**（不是只開新 tab）。
 3. 跑 `/frontend-devkit/init`。
@@ -92,13 +113,16 @@
 | agent 清單多出一個沒看過的 `frontend-devkit/...` | 設定檔 `agents` 的鍵**拼錯了**。OpenCode 不會忽略，而是建立一個 primary agent（無 system prompt、權限 `*/* allow`）；用 `opencode debug agents` 可確認，改掉那個鍵即可 |
 | 改了 kit 檔案但行為沒變 | agent 定義是**進程啟動時載入**：要重啟 TUI 進程，不是開新 tab |
 | 某指令「沒有權限」 | 先 `read` 該 agent 的 allow 清單逐一確認；複合指令（`;`、`&&`、`\|`、`echo`）被拒不等於單條也無權 |
-| `Get-Location` 落點不是你的專案 | shell 落在 service 綁定的專案目錄，`--server`／`--standalone`／cwd 都改不了它 |
+| `Get-Location` 落點不是你的專案 | shell 落在 service 綁定的專案目錄，`--server`／`--standalone`／cwd 都改不了它；macOS 落點檢查一律用 `pwd -P`（與 `git rev-parse --show-toplevel` 比對） |
+| macOS 上 `pwd` 被拒（或落點誤判） | 設計如此：allow 只登記 `pwd -P`、未登記 `pwd`（P12）；`/var` → `/private/var` 的路徑別名會讓 `pwd` 與 Git 的實體路徑對不上 |
+| macOS 上 worktree 依賴壞掉 | `junction` 在 macOS 是固定相對 symlink `../../node_modules`；建完以 `test -e .worktrees/<名稱>/node_modules/<框架套件>/package.json` 驗證 |
 | worktree 內容出現在 `--working` | `.gitignore` 沒有 `.worktrees/`；先 `git check-ignore -v .worktrees/`（退出碼 0＝已忽略） |
 | `npm ci` 在 worktree 失敗 | 主工作區沒有 `node_modules` 時 `junction` 不可用，`depStrategy` 要用 `install-per-worktree` |
 
 ## 驗收狀態
 
-- 關卡 0～8 全數通過（2026-11-11 ～ 11-13）。結果與證據：[`docs/acceptance.md`](docs/acceptance.md) §13.1。
+- 關卡 0～8 全數通過（2026-11-11 ～ 11-13，Windows）。結果與證據：[`docs/acceptance.md`](docs/acceptance.md) §13.1。
+- macOS 驗收另立 [`docs/acceptance.md`](docs/acceptance.md) §13.2（2026-11-14 開立；2026-11-15 複驗：關 0 通過、關 1／2 部分通過、關 3～8 待 TUI；Windows 回歸未驗）；Windows 歷史紀錄保留於 §13.1 不變。
 - 驗收過程抓到 30 個缺陷（A～AH），其中 6 個屬「不看實作就看不出來」：巢狀安裝、0 pack 與整節空白、**pack 正文沒折入**、YAML 縮排、指紋指令無權限。逐條紀錄在 [`docs/acceptance-findings.md`](docs/acceptance-findings.md)。
 
 > 那份 findings 很長（>700 行），**建議保留**：它記錄了「為什麼每一條規則長這樣」。沒有它，後人會把防禦改回去。

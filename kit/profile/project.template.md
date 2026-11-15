@@ -19,14 +19,14 @@
 |---|---|---|---|
 | 專案名稱 | TBD（未確認） | 偵測 | 僅供回報標題；不影響判定 |
 | 技術棧一行 | TBD（未確認） | 偵測 | reviewer 缺背景描述，仍會查，但建議措辭較泛 |
-| shell | TBD（未確認） | 偵測（探針 `Get-Location`；`$`／括號形不可用） | 非 PowerShell 時 kit 的 worktree 程序會停止（主檔 §11） |
+| shell | TBD（未確認） | 偵測（先 `uname -s`：輸出 `Darwin`／`Linux` → `posix`；否則 `Get-Location` 成功 → `powershell`；兩者皆敗 → `TBD（未確認）` 並用 `question` 問你；`$`／括號形不可用） | 值域：`powershell`／`posix`／`TBD（未確認）`（本次只驗 macOS，不宣稱 Linux）；`TBD` 時 compile 折入停用警告並停用 worktree 程序（主檔 §11） |
 | 設定檔路徑 | TBD（未確認） | 偵測 | 無法定位 instructions／model 寫到哪；非法值（見白名單）會造成跨專案提權風險 |
 | kitRoot | TBD（未確認） | 你答（依安裝方式） | compile／inspect 找不到源頭素材，無法重譯或比對 |
 | worktreePolicy | ask | 你答（預設 `ask`） | 缺值視為 `ask`（每次都問） |
-| depStrategy | TBD（未確認） | 偵測＋你確認 | 缺值時不建 worktree（安全側）；pnpm／workspace 誤填 `junction` 會破壞依賴連結 |
-| worktree 目錄 | TBD（未確認） | 你答（建議 `.worktrees/`） | 缺值即無法定位隔離區；非法值可讓工作區落到專案外 |
+| depStrategy | TBD（未確認） | 偵測＋你確認 | 缺值時不建 worktree（安全側）；pnpm／workspace 誤填 `junction` 會破壞依賴連結。`junction` 的平台語意：Windows＝junction、macOS＝固定相對 symlink `../../node_modules`（P4，見 `worktree.procedures.md` 平台段落） |
+| worktree 目錄 | `.worktrees/` | 固定值（P11） | **唯一合法值 `.worktrees/`**（P11）；缺值即無法定位隔離區；其他值 `init`／`inspect` 一律拒絕 |
 | 分支前綴 | TBD（未確認） | 你答 | 缺值時用 kit 預設 `feature/`、`fix/`（並記錄是預設而非你指定） |
-| worktree 名稱前綴 | TBD（未確認） | 你答 | 缺值時用 kit 預設 `review-` 與 `<類型>-<slug>` |
+| worktree 名稱前綴 | `review-` | 固定值（審核前綴；P11） | 缺值時用 kit 預設 `review-` 與 `<類型>-<slug>`；**審核前綴唯一合法值 `review-`**（P11），其他值 `init`／`inspect` 一律拒絕 |
 | 預設基準分支 | TBD（未確認） | 偵測 | 省略範圍的審核無法定義；`/frontend-devkit/review` 不帶範圍會被要求補 |
 | 預設審核範圍 | TBD（未確認） | 偵測 | **不得填保留詞**（`省略`／`預設`／`default`／`無`／空字串）；值只能是 `a..b`、單一 sha、`origin/<分支>`、`--working`。拿不到（例如無 `origin` 遠端）就寫 `TBD（未確認）`，並理解其後果：不帶範圍的 `/frontend-devkit/review` 會被要求補範圍 |
 | 環境檔 | TBD（未確認） | 偵測 | worktree 內跑測試／build 可能因缺設定失敗；非法值有外洩風險 |
@@ -37,14 +37,14 @@
 |---|---|---|
 | 設定檔路徑 | `opencode.json`／`opencode.jsonc`／`.opencode/opencode.json`／`.opencode/opencode.jsonc` 四種字面相對形之一 | `~/.config/opencode/opencode.json`（會改到全域設定，波及全機所有專案）、`.git/config`、絕對路徑 |
 | kitRoot | `~/.config/opencode/frontend-devkit` 或 `.opencode/frontend-devkit` | `/tmp/x`、其他 repo 的路徑（會掉包源頭比對基準） |
-| worktree 目錄 | 專案內相對路徑，如 `.worktrees/` | `../out`（工作區與環境檔落到專案外）、`/abs`、`<盤符>:\…`（絕對路徑形）、`.git`、`.opencode` |
+| worktree 目錄 | 唯一合法值 `.worktrees/`（P11） | `../out`（工作區與環境檔落到專案外）、`build/worktrees/`（自訂目錄會讓靜態權限與 macOS symlink 目標對不上）、`/abs`、`<盤符>:\…`（絕對路徑形）、`.git`、`.opencode` |
 | 環境檔 | 單一檔名，可多檔逐檔列：`.env`、`.env.local`；或 `無`（已確認沒有環境檔，三態之一） | `../secret.env`、`dir/.env`、`.env*`（萬用字元）、含 `:` 的任何形式 |
 
 ### 格式驗證欄（非白名單，值域固定）
 
 - `worktreePolicy` ∈ ｛`ask`、`always`、`never`｝
 - `depStrategy` ∈ ｛`junction`、`install-per-worktree`、`none`｝
-- `shell` ∈ ｛`powershell`、`TBD（未確認）｝`
+- `shell` ∈ ｛`powershell`、`posix`、`TBD（未確認）`｝（本次只驗 macOS；Linux 未驗、不宣稱支援）
 - `預設審核範圍` 只能是 `/frontend-devkit/review` 認得的**實際範圍語法**：`a..b`、單一 sha、`origin/<分支>`、`--working`。「使用者呼叫時不帶範圍」是**呼叫情境、不是可存的值**，不得寫進本欄（值域的唯一權威定義在主檔 §5.1.2；本處只列允許值，兩處若不一致以主檔為準並視為缺陷）。
 
 ## 指令
@@ -131,6 +131,7 @@ TBD（未確認）
 | 指令模式 | 用途 |
 |---|---|
 | 無 | 無 |
+| POSIX 寫入／刪除／執行族（權威清單見 `docs/permission-spec.md` §7.3.5#2） | 一律拒絕：`rm`／`mv`／`touch`／`mkdir`、`sh -c`／`node -e` 等檔案系統寫刪或動態求值條目不得進這一欄 |
 
 > 方案 B 下這一欄**不是授權來源**（專案端不寫 shell 規則）。它的作用有二：① 讓你知道哪些指令會被問——首次執行時你選 `Allow always`，OpenCode 會存成專案級持久 allow，這是 developer 唯一合法的擴充路徑；② 給 `compile` 判斷哪些 gate 需要人工執行。
 > **reviewer 不能靠這一欄擴張**可執行範圍（它的 shell 地板是 deny，而持久 allow 蓋不掉設定好的 deny）；要給 reviewer 新指令只能升級 kit、改主體靜態清單。
@@ -142,6 +143,6 @@ TBD（未確認）
 |---|---|
 | 上次 init／compile 日期與 kit 版本 | TBD（未確認） |
 | 上次 `inspect [probe]` 日期／OpenCode 版本 | TBD（未確認） |
-| probe 第 0 條 `Get-Location` 落點＝本專案？ | TBD（未確認） |
+| probe 第 0 條落點＝本專案？（posix：`pwd -P`；powershell：`Get-Location`，都比對 `git rev-parse --show-toplevel`） | TBD（未確認） |
 | probe 第 1 條（主體靜態清單 gate）／第 2 條（必被拒的寫入指令）結果 | TBD（未確認）／TBD（未確認） |
 | 權限模式（A／B；現行預設 B） | TBD（未確認） |

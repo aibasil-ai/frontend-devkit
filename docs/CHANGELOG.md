@@ -23,12 +23,23 @@
 
 ---
 
+## 2026-11-14 雙平台（macOS）
+
+- 設計：`docs/specs/2026-11-14-macos-compatibility-design.md`（P1–P14，已核准）；實作計畫：`docs/plans/2026-11-14-macos-compatibility-plan.md`。
+- 決策摘要：P1 雙平台並存（Windows 路徑保留、行為不變）；P2 `depStrategy: junction` 欄位不變（macOS＝相對 symlink）；P3 `shell` 值域擴充 `powershell`／`posix`／`TBD（未確認）`（本次只驗 macOS）；P4 symlink 目標固定 `../../node_modules`；P5 清除順序兩平台一致；P6 compile 依 `shell` 只折入對應平台段落；P7 權限並存、不刪任何既有條目；P8 `ln`／`unlink` 來源與目的地收窄；P9 `tools/*.ps1` 保留、新增零依賴 Node `.mjs` 版；P10 macOS 驗收另立 `acceptance.md` §13.2；**P11（breaking change）** `worktree 目錄` 唯一合法值 `.worktrees/`、審核前綴唯一合法值 `review-`，`init`（含重跑）／`inspect` 拒絕其他值、不自動改寫；P12 落點一律 `pwd -P`（`pwd` 不進 allow）；P13 `resolved.md` 檔頭新增 `平台`／`shell` 欄、orchestrator／developer／reviewer 三個 agent 開工守門（`setup` 不套用）；P14 POSIX 寫入／刪除／執行族權威清單落於 `permission-spec.md` §7.3.5#2。
+- 檔案：`kit/`（worktree.procedures.md、project.template.md、四個 agent、init／inspect／review）；`docs/`（install、adding-a-project、experiments R2、acceptance §13.2、tui-run-checklist、permission-spec、主檔修訂、implementation-plan 註記、migration-map 平台對照）；根目錄（README.md、.gitattributes）；`tools/`（check-structure.mjs、scan-forms.mjs、normalize-forms.mjs、README）。
+- 驗收狀態：見 `docs/acceptance.md` §13.2（2026-11-14 開立，2026-11-15 複驗：關 0 通過、關 1／2 部分通過、關 3～8 待 TUI）；Windows 回歸：**未驗（無 Windows 機器）**。
+
+---
+
 ## 附錄 A　原 §16 已決定事項（速查；衝突時以主檔 §2 為準）
 ## 16. 已決定事項
 
 > **本節是索引摘要**：權威定義在 §2 決策彙總與各章節；同一件事兩處不同時，**以 §2 為準**（第 3 輪曾宣稱已有這句但當時沒落地，第 4 輪補上）。
 > 措辭說明：**機制決策已全部定案**；尚未定的不是決策，而是「OpenCode 平台行為的實測結果」（R1），它會決定 permission-spec.md §7.3 走方案 A 還是方案 B——兩方案的行為差異已在本檔寫死，所以實測不會回頭改設計，只改選哪一支。
 （本 spec 無未決欄位）
+
+> **2026-11-14 補註**：下表「平台＝僅 Windows / PowerShell」是 2026-11-11 原版快照；雙平台修訂（P1–P14）已取代它，現行支援 Windows 與 macOS（macOS 驗收見 `docs/acceptance.md` §13.2）。其餘列仍為現行決策。
 
 | 項目 | 決定 |
 |---|---|

@@ -6,7 +6,7 @@
 
 | 項目 | 要求 | 怎麼確認 |
 |---|---|---|
-| 平台 | Windows + PowerShell | `Get-Location` 可用 |
+| 平台 | Windows PowerShell 或 macOS zsh／bash（`shell` 值域 `powershell`／`posix`；本次只驗 macOS） | Windows：`Get-Location` 可用；macOS：`uname -s` 回 `Darwin` |
 | OpenCode | 實測 `v2.2.7` | `opencode --version` |
 | 專案 | git repo | `git rev-parse --show-toplevel` |
 | `.gitignore` | 含 `.worktrees/` | `git check-ignore -v .worktrees/`（退出碼 0＝已忽略） |
@@ -37,6 +37,26 @@ Copy-Item "$kit\profile" "$dst\frontend-devkit\" -Recurse -Force
 Copy-Item "$kit\worktree.procedures.md" "$dst\frontend-devkit\" -Force
 ```
 
+macOS（zsh／bash，效果相同）：
+
+```bash
+# 在 kit repo 根目錄
+KIT="kit"
+DST="<你的專案>/.opencode"
+
+# 先刪目標子目錄再整包複製（重要，見 §5；macOS 的 cp -R 同樣會把來源放進已存在的同名目標）
+rm -rf "$DST/agents/frontend-devkit" "$DST/commands/frontend-devkit" "$DST/frontend-devkit/rules" "$DST/frontend-devkit/profile"
+mkdir -p "$DST/agents/frontend-devkit" "$DST/commands/frontend-devkit" "$DST/frontend-devkit"
+
+cp -R "$KIT/agents/frontend-devkit" "$DST/agents/"
+cp -R "$KIT/commands/frontend-devkit" "$DST/commands/"
+cp -R "$KIT/rules" "$DST/frontend-devkit/"
+cp -R "$KIT/profile" "$DST/frontend-devkit/"
+cp "$KIT/worktree.procedures.md" "$DST/frontend-devkit/"
+```
+
+> `cp -R <來源> <已存在的同名目錄>` 同樣會把來源放**進**目標（`rules/rules/` 巢狀），所以**先刪目標子目錄再複製**，兩平台同則（§5）。
+
 驗證：
 
 ```powershell
@@ -44,11 +64,16 @@ Test-Path "$dst\agents\frontend-devkit\setup.md"       # True
 Test-Path "$dst\frontend-devkit\rules\rules"           # False（若有＝巢狀安裝，見 §5）
 ```
 
+```bash
+test -f "$DST/agents/frontend-devkit/setup.md"          # 退出碼 0＝存在
+test ! -e "$DST/frontend-devkit/rules/rules"            # 退出碼 0＝不存在（有＝巢狀安裝，見 §5）
+```
+
 **重啟 TUI 進程**，然後 `/frontend-devkit/init`。
 
 ### 1b. 全域安裝（**不建議**）
 
-放進 `~/.config/opencode/`（Windows：`%USERPROFILE%\.config\opencode\`）可以讓所有專案共用，但有三個代價：
+放進 `~/.config/opencode/`（Windows：`%USERPROFILE%\.config\opencode\`；macOS：`~/.config/opencode/`）可以讓所有專案共用，但有三個代價：
 
 1. **雙份主體會疊加權限**：同一 id 若同時存在全域與專案兩份，permission 規則會附加，行為難以推理。
 2. 版本只有一份，升級會同時影響所有專案。
@@ -112,6 +137,10 @@ scanner 會用**原始字串**逐字比對 allow 規則，也會把複合指令�
 - `git status --short; echo "---"` ❌ 因為 `echo` 不在清單，整串被拒
 - `git diff HEAD | git hash-object --stdin` ❌ 除非兩段都 allow
 - `New-Item … -Target (Resolve-Path node_modules).Path` ❌ 括號內子指令要個別 allow → 必須拆兩步（先 `Resolve-Path`、再把字面路徑代入）
+- macOS 對照（同樣字面同形）：`pwd -P` ✅ 命中 `pwd -P`；`pwd` ❌（未登記，P12）
+- `test -e node_modules` ✅ 命中 `test -e *`
+- `ln -s ../../node_modules .worktrees/zz/node_modules` ✅ 命中 `ln -s ../../node_modules .worktrees/*/node_modules`（來源固定 `../../node_modules`）
+- `ln -s /etc/passwd .worktrees/zz/passwd` ❌ 來源與目的地都不在收窄 pattern 內
 
 所以：**一個 call 一條指令**，需要多步驟就拆開。
 
@@ -124,7 +153,7 @@ PowerShell 的 `Copy-Item <來源目錄> <已存在的同名目錄> -Recurse` �
 .opencode/frontend-devkit/profile/profile/
 ```
 
-這比「雜亂」嚴重：巢狀副本是**舊版**。若哪天被當成源頭折入，`resolved.md` 的 checksum 反而會對得上，源頭比對等於失效。
+macOS 的 `cp -R <來源> <已存在的同名目錄>` 行為相同。這比「雜亂」嚴重：巢狀副本是**舊版**。若哪天被當成源頭折入，`resolved.md` 的 checksum 反而會對得上，源頭比對等於失效。
 
 `inspect` 會檢查並列出完整路徑，但**不會自行刪除**（那是安裝殘留，不在 agent 的可寫範圍）。
 
@@ -133,7 +162,7 @@ PowerShell 的 `Copy-Item <來源目錄> <已存在的同名目錄> -Recurse` �
 實測（見 [`experiments.md`](experiments.md)）：shell 落在 **service 綁定的專案目錄**，`--server`、`--standalone`、呼叫端 cwd 都改不了它。因此：
 
 - 自動化腳本驅動 kit 流程時，指令可能在**錯的專案**執行。
-- 任何 agent 在動手前都必須先 `Get-Location` 確認落點（`inspect` 的 probe 第 0 條就是這件事）。
+- 任何 agent 在動手前都必須先確認落點（Windows `Get-Location`／macOS `pwd -P`，與 `git rev-parse --show-toplevel` 比對；macOS 不可用 `pwd`——`/var` 與 `/private/var` 的別名會誤判，P12；`inspect` 的 probe 第 0 條就是這件事）。
 - 驗收與正式操作請在目標專案的 TUI 手動跑。
 
 ## 7. 方案 A 覆驗的三步先決（僅在你要改回方案 A 時）

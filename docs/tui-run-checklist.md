@@ -108,3 +108,31 @@ kit 已把修補同步進 app-a／app-b（`setup.md` 現含 `opencode --version`
 3. 任何「我覺得怪」的地方（例如它跳過了你所期待的提問、或它宣稱跑過某個 lint）——這種直覺通常就是 reviewer 會抓的點。
 
 我拿到後會：逐關寫進 `docs/acceptance-findings.md`（通過／不通過＋根因＋要改 kit 哪裡），需要改設計的地方照樣開獨立 reviewer 複查。
+
+---
+
+## macOS 清單（2026-11-14 新增；上方 Windows 清單保留）
+
+> 對應 `docs/acceptance.md` §13.2 的 macOS 關卡 0～8。開場落點確認改用 POSIX 指令；其餘關卡與上方 Windows 流程同構，只把平台指令換成對照列。
+
+**先切到被測 agent（極重要）**：TUI 預設停在 `Build`，它的權限是 `*/* allow`；在 `Build` 下測 `pwd` 會 **EXECUTED**，那是預設 agent 的行為，不是 kit 的結果。請用 `Ctrl+X` → `A` 開 agent 清單（或 `Shift+Tab` 循環），選 `frontend-devkit/setup`（關 2 用）或 `frontend-devkit/orchestrator`／`developer`／`reviewer`。畫面底部的 agent 名稱必須是 `frontend-devkit/*` 才開始計分。
+
+**開場確認（每個 session 第一件事）**：在 app-a 目錄開 TUI，輸入「用 shell 執行一次 `pwd -P`，只回報結果」並與 `git rev-parse --show-toplevel` 比對。**`pwd`（不帶 `-P`）應被 DENIED**（allow 只登記 `pwd -P`，P12）——這正是預期行為，不是故障。落點不是 app-a 先停下。
+
+關卡 2（init）額外觀察點：
+
+- `shell` 應偵測為 `posix`（`uname -s` → `Darwin`）。
+- `resolved.md` 的「worktree 程序」段落**只含 POSIX 平台段落**（出現 `Test-Path`／`New-Item`／`cmd /c` 即錯），檔頭有 `平台：macos`、`shell：posix` 條列行。
+- P11 非法值：暫時把 `worktree 目錄` 填 `build/worktrees/`（或審核前綴填 `audit-`）→ `init` 與 `inspect` 都拒絕並指明「`.worktrees/`」「`review-`」；改回合法值可通過。
+- **P13 平台守門（動態）**：手動把 `resolved.md` 檔頭的 `- shell：posix` 改成 `- shell：powershell`（或 `TBD（未確認）`）→ 分別請 orchestrator（口述「開工」即可）、developer、reviewer 開工 → 三者都應**立即停止**並要求 `/frontend-devkit/init compile`，且**不得自行改寫** `resolved.md`；`setup` 不套用（它會照常寫檔頭）。復原檔頭後重跑一次確認正常。三個 agent 的原始回覆都要貼回。
+
+關卡 4（dev）額外觀察點：
+
+- worktree 建立用 `ln -s ../../node_modules .worktrees/<名稱>/node_modules`（symlink，無 `Resolve-Path` 兩步）。
+- 清除先 `unlink .worktrees/<名稱>/node_modules`、再 `git worktree remove --force`；主工作區 `node_modules` 完好。
+
+關卡 5（review）額外觀察點：審核前綴固定 `review-`；清除同關卡 4 的 `unlink` 先行。
+
+關卡 7（安全地板）額外觀察點：四種非法值之一改填 `worktree 目錄: build/worktrees/`（非 `../out`）也應被拒。
+
+建置前置（關卡 0，人工）：`mktemp -d` 建 eval 目錄 → `npm create vite@latest app-a -- --template vue` → `npm install` → `npm run build`；複製出 app-b 並砍 `.opencode/frontend-devkit/project.md`；兩者 `git init`＋留一個 commit；kit 以專案層裝入兩專案 `.opencode/`（macOS 指令見 `docs/install.md` §1a）；**重啟 TUI 進程**。

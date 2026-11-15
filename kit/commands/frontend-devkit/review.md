@@ -22,4 +22,4 @@ subagent: false
 - 開始前確認 `resolved.md` 的啟用清單與 `project.md` 的 `## 啟用規則` 一致；不一致或缺檔先提示 `/frontend-devkit/init compile`。
 - 若啟用清單內沒有任何 `security/*`：你沒有 `question` 權限，**不要假設使用者已同意** → 不開始審核，輸出固定句「啟用清單無 `security/*`，需二次確認；請改走 `/frontend-devkit/review-fix`，或在 `project.md` 的 `## 專案覆寫` 明示『已確認僅執行主體基本安全項』後重跑」。
 - 驗證指令若不在你可執行的靜態清單內，照實回報「因方案 B 白名單未含此指令，未獨立執行」，不得宣稱跑過。
-- 若曾建立審核 worktree（`review-<sha7>`），結束前**必定清除**：先 `cmd /c rmdir` 該 worktree 的 `node_modules`，再 `git worktree remove --force`，最後用 `git worktree list` 確認。
+- 若曾建立審核 worktree（`review-<sha7>`；審核前綴固定 `review-`），結束前**必定清除**：依 `resolved.md` 的 worktree 程序平台段落——先移除連結（Windows `cmd /c rmdir .worktrees\review-<sha7>\node_modules`／macOS `unlink .worktrees/review-<sha7>/node_modules`），再 `git worktree remove --force .worktrees/review-<sha7>`，最後用 `git worktree list` 確認。

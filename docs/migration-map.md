@@ -35,3 +35,20 @@
 | reviewer.md／commands 的 `webfetch: deny`、`skill: deny`、`question` 權限差異 | §7.1「其他工具」欄明確列出四個 agent 的 `webfetch`／`skill`／`question` 取捨 |
 
 ---
+
+## 12.1 平台對照（PowerShell → POSIX；2026-11-14 雙平台修訂）
+
+> 本遷移圖是 2026-11-11 Windows-only 的**歷史對照**，不因平台改寫（`docs/specs/2026-11-14-macos-compatibility-design.md` P1 雙平台並存）；以下平台對照是新增，雙平台決策權威在該設計文件。
+
+| 動作 | PowerShell | POSIX（macOS） |
+|---|---|---|
+| 存在性檢查 | `Test-Path <路徑>` | `test -e <路徑>` |
+| 建立 node_modules 連結 | junction 兩步（`Resolve-Path node_modules`＋`New-Item -ItemType Junction`） | `ln -s ../../node_modules .worktrees/<名稱>/node_modules`（目標固定，P4） |
+| 移除連結 | `cmd /c rmdir .worktrees\<名稱>\node_modules` | `unlink .worktrees/<名稱>/node_modules` |
+| 複製環境檔 | `Copy-Item <環境檔> .worktrees\<名稱>\<環境檔>` | `cp <環境檔> .worktrees/<名稱>/<環境檔>` |
+| checksum | `Get-FileHash *` | `shasum -a 256 *` |
+| 落點 | `Get-Location` | `pwd -P`（**不是** `pwd`；P12） |
+| pack 正文存在性 | `Select-String *` | `grep -n *` |
+| shell／OS 偵測 | `Get-Location` | `uname -s`（`Darwin`／`Linux` → `posix`） |
+
+---

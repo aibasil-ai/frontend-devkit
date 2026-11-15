@@ -699,3 +699,68 @@ frontend-devkit/reviewr    (mode=primary)    ← 幽靈
 
    四個 agent 都出現（`developer`＝subagent、`orchestrator`＝primary、`reviewer`／`setup`＝all）才算通過。實測已通過。
 
+
+---
+
+## macOS 驗收（2026-11-15，CLI／靜態複驗）
+
+環境：OpenCode v2.2.7、macOS 26.5.1 arm64、Darwin 25.5.0、zsh、Node v25.6.1、npm 11.9.0、git 2.50.1。設計與計畫：`docs/specs/2026-11-14-macos-compatibility-design.md`、`docs/plans/2026-11-14-macos-compatibility-plan.md`。eval 目錄：`/var/folders/ks/xqfr4bcs7_g4p_swlzjsj_f40000gn/T/tmp.WoYu1IlgEM`（app-a 已裝 kit、app-b 無 profile）。
+
+### 已驗證（有原始輸出）
+
+1. **靜態檢查**：`node tools/check-structure.mjs` exit 0，五段全 PASS（frontmatter 0 異常、專屬事實 0、指令紀律乾淨、三段式次序正確、POSIX allow 全在尾巴第 1 段之前）；`node tools/scan-forms.mjs` 0 命中。
+2. **載入**：`opencode debug agents` 只列出 `frontend-devkit/developer`、`orchestrator`、`reviewer`、`setup` 四個，無 `rules/...` 幽靈條目。
+3. **POSIX 權限矩陣**（臨時 agent `zzprobe` ＋ `opencode run`，跑完刪除）：
+
+| 指令 | 結果 |
+|---|---|
+| `pwd -P` | EXECUTED |
+| `pwd` | DENIED |
+| `uname -s` | EXECUTED（`Darwin`） |
+| `test -e .`／`test -e node_modules` | EXECUTED |
+| `shasum -a 256 .gitignore` | EXECUTED |
+| `grep -n "a b" .gitignore` | EXECUTED |
+| `git rev-parse --show-toplevel` | EXECUTED |
+| `cp .gitignore .worktrees/zzprobe/.gitignore` | EXECUTED（目的地不存在而失敗） |
+| `ln -s ../../node_modules .worktrees/zzprobe/node_modules` | EXECUTED（目的地不存在而失敗） |
+| `unlink .worktrees/zzprobe/node_modules` | EXECUTED（不存在而失敗） |
+| `git commit --allow-empty -m probe` | DENIED |
+| `rm .worktrees/zzprobe/zz` | DENIED |
+| `ln -s /etc/passwd .worktrees/zzprobe/passwd` | DENIED |
+| `unlink .worktrees/zzprobe/passwd` | DENIED |
+| `mv .gitignore zzprobe-moved` | DENIED（新增 POSIX 族） |
+| `node -e "process.exit(0)"` | DENIED（新增 POSIX 族） |
+| `sh -c "echo hi"` | DENIED（新增 POSIX 族） |
+| `chmod 600 .gitignore` | DENIED（新增 POSIX 族） |
+
+4. **關卡 0（建置）**：`mktemp -d` 建 app-a（vue 範本）→ `npm install` → `npm run build` 成功；app-b 為 app-a 複本；兩者 `git init` 各留一個 baseline commit；`pwd` 回 `/var/folders/...`、`pwd -P` 回 `/private/var/folders/...`，與 `git rev-parse --show-toplevel` 一致；kit 以專案層裝入 app-a `.opencode/`，`test -f .../setup.md` 通過、`test ! -e .../rules/rules` 通過。
+5. **P11／P13 靜態核對**：`init.md` 有 P11 拒絕條（含 `.worktrees/`、`review-` 兩個合法值、禁止自動改寫）；`inspect.md` 有 P11 檢查、`pwd -P` probe、`平台`／`shell` 檔頭重建；orchestrator／developer／reviewer 三個 agent 有 P13 開工守門（`TBD`／不一致／缺欄 → 停止並要求 `init compile`），`setup` 為檔頭寫入者、設計上不套用；`setup.md` §4 有平台擇一折入、`TBD` 停用警告、檔頭 `平台：windows | macos`／`shell：powershell | posix` 規格。
+6. **文件一致性 grep**：`<WT_LINK_TARGET>`／`<WT_DIR>`／`<REVIEW_PREFIX>` 在 `kit/` 0 命中（僅設計／計畫文件描述「已移除」）；「僅／只有 PowerShell」現行規則 0 命中；`build/worktrees`／`audit-` 僅出現在非法值範例；`worktree.procedures.md` 的 posix 段落無 PowerShell 指令、powershell 段落無 POSIX 指令。
+
+### 待使用者 TUI 實測
+
+- 關 1 的「六個指令可被選取」與 edit deny 互動。
+- 關 2 `init`／P11 動態拒絕、`resolved.md` 實際產物；**P13 動態守門**：把 `resolved.md` 檔頭 `shell` 改成另一值或 `TBD（未確認）` → orchestrator／developer／reviewer 三個 agent 開工即停止並要求 `init compile`（`setup` 不套用）；復原後正常。
+- 關 3～8（compile／shasum／inspect、dev 全流程、review、降級、安全地板、零影響）。
+- 步驟與預期結果見 `docs/acceptance.md` §13.2 與 `docs/tui-run-checklist.md` macOS 清單；未跑不得標「通過」。
+
+### 本輪發現與修復
+
+1. **計畫缺口（已修）**：文件宣稱「各 agent 尾巴第 1 段以 §7.3.5#2 為正典」，但任務 2 只加了 allow、未把 POSIX 寫入／刪除／執行族加進尾巴 deny。已補：orchestrator／developer／reviewer 各 21 條、setup 22 條（純新增，既有 Windows 條目零刪改）；`check-structure.mjs` 重跑全 PASS。
+2. **pre-existing 引用斷裂（已修）**：主檔 §5.1.2 歷史註與 §7.1 尾巴段原引用 §7.3.5#2 指 Windows 可變依賴清單，與新 POSIX 族語意衝突；已改指 §7.3.5 第 2 點並加歷史註。主檔 §8 指令表的 `permission-spec.md §8.2` 與 permission-spec §7.3.4 第 5 點的自身 `§8.2` 引用為既有斷裂，已改指 §7.3.4 第 5 點／移除失效編號。
+3. **Windows 回歸**：未驗（無 Windows 機器），不宣稱已驗。
+4. **執行限制**：OpenCode Go 與免費模型額度在複驗期間用盡，CLI 動態探針到此為止；已取得的 18 條權限矩陣結果不受影響。
+5. **審查後修正（2026-11-15，第二輪）**：
+   - P13 用語由「四個 agent」統一為「orchestrator／developer／reviewer 三個（`setup` 為寫入者，不套用）」，避免把 setup 誤列為守門者。
+   - `init auto` 與 P11 衝突：`auto` 直接寫 `.worktrees/`／`review-`，不寫 TBD；`setup.md` §2 寫入前加 P11 唯一值檢查（否則 auto 會產出自己下一步就拒絕的值）。
+   - 驗收補 P13 動態關卡（`acceptance.md` §13.2 關 2、`tui-run-checklist.md` macOS 清單），不再以靜態宣稱代替。
+   - orchestrator「兩道檢查」改「三道」；清除路徑改 repo 相對字面 `.worktrees/<名稱>/node_modules`，與窄化 allow 同形。
+   - README／CHANGELOG 驗收狀態改「部分通過；關 3～8 待 TUI」；CHANGELOG 檔案分類修正；計畫狀態與 checkbox 同步。
+   - `tools/scan-forms.mjs` 改為與 `.ps1` 同格式（basename、每行只報第一筆）；`normalize-forms.mjs` 寫回前 strip BOM（已用帶 BOM 副本實測：去除且冪等）；`check-structure.mjs` §5 只計 `effect: "allow"` 的 POSIX 條目。
+   - 第二輪複核後再修：`acceptance.md` 關 1 的 18 條組成改為「R2 13 條 + 新增 5 條探針（4 deny、1 allow）」；orchestrator 的 P13 缺欄條件統一為缺 `平台`／`shell` 任一欄；CHANGELOG 附錄 A 加歷史補註（平台列為 2026-11-11 快照）。
+6. **TUI 測試設定陷阱（非 kit 缺陷，文件已補）**：首次 TUI 實測時畫面底部是 `Build`（`*/* allow`），`pwd` 因而 EXECUTED、`pwd -P` 與 `git rev-parse --show-toplevel` 都正確解析到 `/private/var/.../app-a`。kit agent 的權限必須先用 `Ctrl+X` → `A`（或 `Shift+Tab`）切到 `frontend-devkit/*` 才成立；此陷阱已寫進 `tui-run-checklist.md` 與 `acceptance.md` §13.2 關 1。
+7. **eval 環境補正（非 kit 變更）**：app-b 原本漏裝 kit，已補裝並保留「無 `project.md`」狀態，關 6 才測得起來；另清除 repo 與 eval 目錄內的 `.DS_Store`（本機垃圾檔、未進版控）。
+
+### 判定
+
+關 0 通過；關 1／2 部分通過（權限、載入、靜態規則已驗，動態流程待 TUI）；關 3～8 待 TUI。**不宣稱 macOS 全流程已驗收完成。**

@@ -41,6 +41,9 @@ permissions:
   - { action: "shell",  resource: "yarn lint *",                effect: "allow" }
   - { action: "shell",  resource: "yarn build *",               effect: "allow" }
   - { action: "shell",  resource: "bun test *",                 effect: "allow" }
+  # ── 放行：POSIX 對照（macOS；上方 Windows 條目保留，P7；developer 不建／不除 worktree，不需要 ln／unlink／cp）
+  - { action: "shell",  resource: "pwd -P",                     effect: "allow" }
+  - { action: "shell",  resource: "test -e *",                  effect: "allow" }
   # ── 尾巴三段式：第 1 段真地板（含 git 寫入與檔案系統寫刪／任意執行）
   - { action: "shell",  resource: "git commit *",               effect: "deny" }
   - { action: "shell",  resource: "git push *",                 effect: "deny" }
@@ -70,6 +73,28 @@ permissions:
   - { action: "shell",  resource: "icacls *",                   effect: "deny" }
   - { action: "shell",  resource: "rd *",                       effect: "deny" }
   - { action: "shell",  resource: "erase *",                    effect: "deny" }
+  # ── 第 1 段續：POSIX 寫入／刪除／執行族（正典：permission-spec.md §7.3.5#2；P14；`rm *` 已在上方）
+  - { action: "shell",  resource: "mv *",                       effect: "deny" }
+  - { action: "shell",  resource: "touch *",                    effect: "deny" }
+  - { action: "shell",  resource: "mkdir *",                    effect: "deny" }
+  - { action: "shell",  resource: "rmdir *",                    effect: "deny" }
+  - { action: "shell",  resource: "sed -i *",                   effect: "deny" }
+  - { action: "shell",  resource: "dd *",                       effect: "deny" }
+  - { action: "shell",  resource: "tee *",                      effect: "deny" }
+  - { action: "shell",  resource: "chmod *",                    effect: "deny" }
+  - { action: "shell",  resource: "chown *",                    effect: "deny" }
+  - { action: "shell",  resource: "chgrp *",                    effect: "deny" }
+  - { action: "shell",  resource: "xattr *",                    effect: "deny" }
+  - { action: "shell",  resource: "truncate *",                 effect: "deny" }
+  - { action: "shell",  resource: "sh -c *",                    effect: "deny" }
+  - { action: "shell",  resource: "bash -c *",                  effect: "deny" }
+  - { action: "shell",  resource: "zsh -c *",                   effect: "deny" }
+  - { action: "shell",  resource: "node -e *",                  effect: "deny" }
+  - { action: "shell",  resource: "python -c *",                effect: "deny" }
+  - { action: "shell",  resource: "python3 -c *",               effect: "deny" }
+  - { action: "shell",  resource: "perl -e *",                  effect: "deny" }
+  - { action: "shell",  resource: "ruby -e *",                  effect: "deny" }
+  - { action: "shell",  resource: "php -r *",                   effect: "deny" }
   # ── 第 2 段：依賴寫入全族（developer 沒有第 3 段例外，所以連不可變安裝也擋：依賴一律交協調者處理）
   - { action: "shell",  resource: "npm install *",              effect: "deny" }
   - { action: "shell",  resource: "npm i *",                    effect: "deny" }
@@ -129,7 +154,8 @@ permissions:
 協調者會給你：模式（`dev` 或 `fix`）、任務描述（第 2 輪起是 reviewer 的 ISSUES 清單＋原描述）、**工作目錄絕對路徑**。缺模式或缺工作目錄 → 先回報缺漏，不要自行猜測。
 
 - **只能在指定的工作目錄內改動檔案**；該目錄以外的檔案一律不碰（包含主工作區，除非工作目錄本身就是主工作區）。
-- bash 一律用 `workdir` 參數指定該工作目錄，**不要用 `cd`**；讀寫檔案用該目錄下的絕對路徑。
+- shell 指令一律用 `workdir` 參數指定該工作目錄，**不要用 `cd`**；讀寫檔案用該目錄下的絕對路徑。
+- **平台守門（P13）**：開工先比對 `project.md` 的 `shell` 與 `resolved.md` 檔頭的 `平台`／`shell` 欄（見 §2）；不一致即停止。
 - 你的 shell 起頭是 `ask`：**白名單外的指令會跳出詢問使用者**，這是設計內的行為。需要時照實說明你要跑什麼與為什麼，不要企圖改寫設定檔來免問（你沒有設定檔與 `.opencode/`、`.git/` 的寫入權）。
 
 ## 2. 專案依據（必須先讀）
@@ -139,6 +165,7 @@ permissions:
 - `## 指令` 決定 test／lint／build 的指令與 timeout（寫 `無` 的 gate 就不跑、並在回報標明；寫 `TBD（未確認）` 的要在回報列「因 TBD 未執行 X」，不得宣稱跑過）。
 - `## 測試慣例`、`## 回歸熱點`、`## 共用項目類別`、`## 安全慣例` 決定你的影響範圍分析與測試寫法。
 - `resolved.md` 是啟用 pack 與 worktree 程序的合併產物；**不要**去讀 `kitRoot` 的 pack 原文。
+- **平台守門（P13）**：比對 `project.md` 的 `shell` 與 `resolved.md` 檔頭的 `平台`／`shell` 欄（條列行：`- 平台：windows | macos`、`- shell：powershell | posix`）；`shell` 為 `TBD（未確認）`、不一致、或檔頭缺欄 → **停止並回報協調者**，要求使用者先跑 `/frontend-devkit/init compile`。不得自行改寫 `resolved.md`。
 - 若 profile 的 gate 指令不在你可執行的靜態清單內（例如專案自訂 `npm run test:e2e` 之類）→ 會被問或被拒；此時照實回報「該 gate 需人工執行」，不要改用其他指令蒙混或宣稱已跑。
 
 ## 3. 模式 dev

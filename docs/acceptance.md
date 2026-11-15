@@ -65,3 +65,23 @@
 八關打勾只是門檻；**真正的產出是 26 個缺陷（A–AG）與 3 個「未成立」的撤回**。其中 5 個（H、I、W、AA、AD）屬於「不看實作就看不出來」的類型——尤其 **W**（pack 正文沒折入）會讓安全檢查**靜默失效而八關全過**，正是這套驗收流程存在的理由。
 
 ---
+
+## 13.2 macOS 關卡 0～8（2026-11-14，狀態：部分通過（2026-11-15 複驗）；其餘待 TUI）
+
+> 本節是 macOS 平台的驗收（P10）；§13／§13.1 的 Windows 歷史一律不動。執行方式依 `docs/tui-run-checklist.md` 的 macOS 清單，每關原始輸出貼回後回填狀態與證據（未過 → 修 kit 檔、重跑該關，不得放寬斷言）。Windows 回歸：**未驗（無 Windows 機器）**。
+>
+> **2026-11-15 複驗範圍**（CLI／靜態，非 TUI）：關 0 建置與 `pwd`／`pwd -P` 已實測；關 1 的 POSIX 權限矩陣已用臨時 probe agent + `opencode run` 逐條實測（18 條）、agent 清單已用 `opencode debug agents` 實測；關 2 的 agent 載入已實測，`init`／P11 動態流程待 TUI；P11／P13 的文字與 allow／deny 字面已靜態逐條核對。關 3～8 的動態流程仍需使用者 TUI 實測。eval 目錄：`/var/folders/ks/xqfr4bcs7_g4p_swlzjsj_f40000gn/T/tmp.WoYu1IlgEM`（app-a 已裝 kit、app-b 無 profile）。
+
+| 關 | 在哪 | 檢查什麼 | 通過條件 | 狀態 |
+|---|---|---|---|---|
+| 0 建置（人工） | `mktemp -d` 建的 eval 目錄 | 由你在殼層手動建兩個試寫專案：`app-a`＝`npm create vite@latest app-a -- --template vue` 後 `npm install`（要網路）；`app-b`＝複製 `app-a` 再手動砍 `.opencode/frontend-devkit/project.md`。兩者各自 `git init` 並留一個 commit；記錄 `pwd` vs `pwd -P` 的差異（預期 `/var/...` → `/private/var/...`）；kit 以專案層裝入兩專案 `.opencode/`（macOS 指令見 `docs/install.md` §1a）後**重啟 TUI 進程** | 兩個專案都能 `npm run build` 過；`pwd -P` 與 `git rev-parse --show-toplevel` 一致；kit 的 agent 不做這些動作 | **通過（2026-11-15）**：app-a／app-b `npm run build` 成功；`/var/...` → `/private/var/...` 一致；kit 專案層安裝驗證（`setup.md` 存在、無 `rules/rules`）；app-a／app-b 各一個 baseline commit |
+| 1 載入與 POSIX 權限 | 任一探視用資料夾（尚未 init） | **先切到 `frontend-devkit/*` agent（`Ctrl+X` → `A`）；`Build` 的 `pwd` 會 EXECUTED，不計分**；四個 `frontend-devkit/*` agent、六個指令可被選取；POSIX 權限實測：`pwd` DENIED、`pwd -P` EXECUTED、`uname -s` EXECUTED、`ln -s /etc/passwd …` DENIED、`unlink …/passwd` DENIED、`git commit --allow-empty` DENIED；edit deny 清單 | 逐條與 `experiments.md` R2 表 13 條 + 新增 5 條探針（4 條 deny：`mv`／`node -e`／`sh -c`／`chmod`；1 條 allow：`git rev-parse --show-toplevel`）一致，共 18 條；agent 清單不多出 `rules/...` 條目 | **部分通過（2026-11-15）**：18 條權限矩陣逐條符合（含 `mv`／`node -e`／`sh -c`／`chmod` 新 deny）；`opencode debug agents` 只列四個 `frontend-devkit/*`、無幽靈；edit deny 靜態已核對。六個指令「可被選取」待 TUI |
+| 2 init 與 P11／P13 | app-a | `init` 偵測 `shell=posix`（`uname -s` → `Darwin`）；`resolved.md` 的 worktree 程序段落**只含 POSIX 平台段落**（無 PowerShell 指令）與檔頭 `平台`／`shell` 欄；P11 非法值拒絕：`worktree 目錄: build/worktrees/` 與審核前綴 `audit-` 都讓 `init`（含重跑）與 `inspect` 拒絕並指明「`.worktrees/`」「`review-`」；改回合法值可通過；**P13 動態**：手動把 `resolved.md` 檔頭 `shell` 改成 `powershell`（或 `TBD（未確認）`）→ orchestrator／developer／reviewer 開工即停止並要求 `/frontend-devkit/init compile`（`setup` 不套用），不得自行改寫檔頭；復原後正常 | 非法值不自動改寫；錯誤訊息含兩個合法值字面；三個 agent 都停止且未動檔 | **部分通過（2026-11-15）**：agent 載入、P11 拒絕文字、`resolved.md` 檔頭規格、平台段落擇一規則、三個 agent 的 P13 守門文字皆靜態核對通過；`init`／`inspect` 動態行為與 P13 停止行為待 TUI |
+| 3 compile／shasum／inspect | app-a | `compile` 用 `shasum -a 256` 算 checksum；`inspect` 重建內文後檔頭 `平台`／`shell` 仍正確、worktree 程序段落仍只含 POSIX 段落 | 檔頭欄與 `project.md` 的 `shell` 一致 | 待 TUI 實測 |
+| 4 dev 全流程 | app-a | `dev` 加一個小功能：`question` 先問 worktree、建立用 `ln -s ../../node_modules .worktrees/<名稱>/node_modules`、七區段回報、reviewer 獨立查證、PASS 後 commit 訊息先審、清除先 `unlink` 再 `git worktree remove --force`、主工作區 `node_modules` 完好 | 全流程不問多餘問題、結束 `.worktrees/` 乾淨 | 待 TUI 實測（symlink 建立／移除與 `git worktree remove --force` 不跟隨連結刪主工作區 `node_modules` 已於 2026-11-14 暫存 repo 實測，見 `experiments.md` R2） |
+| 5 審核關 | app-a 故意留一個爛 commit | `review <sha>`：審核 worktree（`review-<sha7>`）建立與清除、`VERDICT`、七個區段齊全 | 有「嚴重或一般」就 FAIL；`git worktree list` 只剩主工作區；`review-` 前綴固定 | 待 TUI 實測 |
+| 6 降級關 | app-b（砍掉 `project.md`）／`shell: TBD` 的假 profile／口述 gate | 無 profile 不派工並提示 init；`shell: TBD（未確認）` 時 compile 折入停用警告、worktree 程序停用（P6）；口述 gate 模式不虛報 | 每種狀況停止點與提示符合規格；口述模式 gate 沒被虛報 | 待 TUI 實測 |
+| 7 安全地板關 | app-a | (a) 停用 `security/vue-xss` → dev／fix／review-fix 走 `question` 二次確認、`/review` 不開始審核；(b) `## 專案覆寫` 企圖取消安全檢查 → reviewer 照查並列「嚴重」；(c) 總括式豁免 → 拒絕；(d) 四種非法值（`設定檔路徑`→`~/.config/opencode/opencode.json`、`kitRoot`→`/tmp/x`、`worktree 目錄`→`build/worktrees/`、`環境檔`→`../secret.env`）→ 全部拒絕寫入並說明原因 | 四種企圖都被擋；覆寫未被當授權 | 待 TUI 實測（POSIX 寫入族 deny 已用 probe agent 實測 DENIED） |
+| 8 零影響 | 既有專案（唯讀對照） | `git status --short`、`.opencode/` 內容、舊 `/dev` 抽測 | 工作區乾淨；四個檔 diff 為空；舊流程照常 | 待 TUI 實測 |
+
+---

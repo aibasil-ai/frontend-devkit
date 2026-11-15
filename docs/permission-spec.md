@@ -32,7 +32,7 @@
 3. **匹配是 whole-value wildcard：`*` 零個以上字元（含 `/`）、`?` 恰一字元、其他為字面。沒有 `|`、也沒有 regex。** 反斜線會正規化為斜線，Windows 上比對不分大小寫。
 4. **最後符合者勝**；官方文件給的範例就是把特定 exceptions 接在寬規則之後。尾綴 ` *`（含空白）的 shell pattern **也會匹配無參數形式**（`"git status *"` 同時匹配 `git status` 與 `git status --short`）。
 5. 組合順序：lower-priority config 先載入 → global rules 附加 → **agent rules 最後附加**；同一操作可能檢查多個 resource，**任一 deny 即 deny**，否則任一 ask 即 ask。
-6. shell 走內建 scanner（支援 PowerShell）：複合指令與 `cd` 目標會被拆成多個 subcommand 資源逐一比對；**語法异常或動態求值（例 `node -e`）無法安全分析時直接 scanner error，不執行**。
+6. shell 走內建 scanner（支援 PowerShell；**POSIX shell 指令亦可被 scanner 匹配**——`test`、`shasum`、`grep` 等 shell builtin／外部指令同樣逐字比對，R2 實測見 `experiments.md`）：複合指令與 `cd` 目標會被拆成多個 subcommand 資源逐一比對；**語法异常或動態求值（例 `node -e`）無法安全分析時直接 scanner error，不執行**。
 7. `ask` 被客戶端選「Allow always」會存成**專案級的持久 allow**，但**永遠蓋不掉設定好的 deny**。
 8. `external_directory` 預設 allow（專案外的絕對路徑讀寫不詢問），但使用者可加 `{"action":"external_directory","resource":"*","effect":"ask"}` 把它改成詢問——所以「agent 去 `~/.config/...` 讀 kit 素材」不能當設計前提（D15 的由來）。
 
@@ -48,6 +48,10 @@
 | 要**最嚴**時可用無尾綴的精確形 | `git fetch *` 放行任何 refspec | `git fetch`（精確形、禁一切參數）是**比 ` *` 更嚴的合法選項**，用於 `git worktree list`、`git branch --show-current`、`git fetch` 這類「不該有參數也合理」的指令（第 3 輪 S4） |
 | **字面同形鐵律**（第 5 輪補：先前只在 §9.3 出現，本表卻被引用為出處） | 程序檔寫 `Resolve-Path node_modules`、allow 寫 `Resolve-Path -Path node_modules` → 實測**互不匹配**（第 5 題：scanner 用原始字串逐字比對、不重組參數） | allow 的 resource 必須與「agent 實際要打出的字串」**逐字相同**；`X`、`X Y`、`X -Path Y` 視為三條不同規則。程序檔與 frontmatter 白名單要成對審（§9.3、acceptance.md §13 關卡 4） |
 | **`$` 變數成員存取與括號子運算式屬高危形，程序檔不要這樣寫**（第 5 輪補引用） | 實測 `Write-Output $PSVersionTable.PSVersion.ToString()` 與 `Write-Output (Resolve-Path .).Path` 都 DENIED，即使 `Write-Output *` 已在白名單 | 程序檔一律用「無 `$`、無括號」的形式，需要中間值就走兩步（先取值、再把**已驗證的字面值**代入下一條，§9.3）。第 8 題只記錄到 DENIED、**未存錯誤訊息**，「無法安全分析／次指令」屬推定，關卡 4 要存 raw 輸出覆核 |
+| POSIX 指令用同一套規則：字面同形、尾綴 ` *`、逐條展開（R2） | 程序檔寫 `ln -s ../../node_modules <目標>`、allow 寫 `ln -s <來源> <目標>` → 互不匹配 | allow 與實際打的字串逐字相同：`ln -s ../../node_modules .worktrees/*/node_modules`（來源固定 `../../node_modules`）、`unlink .worktrees/*/node_modules`、`pwd -P`（**不是** `pwd`，P12）、`test -e *` |
+| POSIX 語法陷阱：`$()`／反引號／括號子運算式同屬高危形 | `shasum -a 256 $(ls)`、`test -e (…)` 會被 scanner 拒 | 只用無 `$`、無括號的字面形：`shasum -a 256 <檔>`、`test -e <路徑>`；需要中間值就走兩步 |
+| `cp` 來源紀律（與 Windows `Copy-Item *` 對等，來源不受 pattern 限制） | 把任意檔複製進 worktree | 只複製 profile `環境檔` 白名單的單一檔名；配合提示詞紀律與 reviewer diff 檢查，不宣稱權限已擋死 |
+| `grep -n` 引號參數（R2 實測：`grep -n "a b" .gitignore` EXECUTED） | pattern 含空白時整串仍逐字比對 | `grep -n "<pattern>" <檔>` 逐字同形；只准 `grep -n`，不開 `grep -r` 遞迴（超出需求） |
 
 #### 7.3.3 主體自給自足的規則鏈（D13）
 
@@ -72,6 +76,12 @@ permissions:
   - { action: "shell",    resource: "cmd /c rmdir .worktrees/*", effect: "allow" }
   - { action: "shell",    resource: "Copy-Item * .worktrees/review-*", effect: "allow" }
   - { action: "shell",    resource: "New-Item -ItemType Junction -Path .worktrees/review-*", effect: "allow" }
+  # ── 放行：POSIX 對照（macOS，2026-11-14 雙平台；來源與目的地收窄，P8）
+  - { action: "shell",    resource: "pwd -P",                      effect: "allow" }
+  - { action: "shell",    resource: "test -e .worktrees/review-*", effect: "allow" }
+  - { action: "shell",    resource: "ln -s ../../node_modules .worktrees/review-*/node_modules", effect: "allow" }
+  - { action: "shell",    resource: "cp * .worktrees/review-*",    effect: "allow" }
+  - { action: "shell",    resource: "unlink .worktrees/review-*/node_modules", effect: "allow" }
   # （不給 reviewer Get-FileHash：checksum 驗算屬 setup／compile，§6.3）
   # ── 尾巴三段式
   - { action: "shell",    resource: "git push *",             effect: "deny" }   # 第 1 段：絕對地板
@@ -100,7 +110,7 @@ developer 的尾巴群（逐條展開、**不含 pipe**；依 §7.1 三段式排
 2. **關鍵前提（G3＋第 3 輪修正：比對對象要明确排除地板，否則方案 A 被自己封殺）**：專案端追加的每一條 `allow`，**不得命中主體「尾巴三段式第 1、2 段」的任何 deny pattern**。注意**不含** `resource: "*"` 的那條地板 deny——若把地板也算進比對，任何窄域 allow 都命中 `*`，`setup` 會拒絕寫入**所有**專案端 allow，與本節第 1、4 點和 permission-spec.md §7.3.0 方案 A 直接矛盾。只有滿足這個前提，「兩種次序都不偏鬆」才成立：若次序是「jsonc 先、.md 後」且該 allow 命中第 1／2 段 deny，最後符合者勝就會**翻掉地板**。另需記得 D14 所稱「任何 allow 蓋不掉」的地板**僅指第 1 段**，第 2 段可被第 3 段例外翻回（§7.1）；而官方只保證「持久批准（`allow always` 存下的規則）蓋不掉設定的 deny」，並未保證 jsonc 規則蓋不掉 `.md` 的 deny。
 3. 此前提**必須機械檢查，不能只靠提示詞**：`setup` 寫入任何 allow 前，逐條與「主體四個 agent 的 deny resource」做 wildcard 比對，命中即**拒絕寫入**並告知你該指令屬主體禁止範圍；`inspect` 重跑同一比對，把「專案端 allow ∩ 主體 deny 必須為空」列為檢查項（§8）。
 4. 有了第 2、3 點，失配模式才真的只剩「偏嚴」一種：次序為「jsonc 先、 .md 後」時，專案端窄 allow 被主體地板 deny 蓋掉 → reviewer 少一條指令而卡住（可用性問題，非安全問題）；次序為「 .md 先、jsonc 後」時窄 allow 生效。**兩種次序的安全邊界一致**，這才叫次序無關。
-5. **方案 B 已是現行預設**，所以本節第 1–6 點只在「方案 A 覆驗成功後」才適用（permission-spec.md §7.3.0 先決步驟）。`inspect [probe]` 在 B 下的職責改為**版本迴歸偵測**（§8.2）：第 0 條 `Get-Location` 確認落點、第 1 條測主體靜態清單內的 gate、第 2 條測必被拒的寫入指令。第 1 條被拒 → 清單與實作不同步或落點錯了；第 2 條被准 → **立即停用 kit**（提權漏洞，不是可用性問題），並引用該規則出自哪個檔案、哪個陣列位置。
+5. **方案 B 已是現行預設**，所以本節第 1–6 點只在「方案 A 覆驗成功後」才適用（permission-spec.md §7.3.0 先決步驟）。`inspect [probe]` 在 B 下的職責改為**版本迴歸偵測**：第 0 條 `Get-Location` 確認落點、第 1 條測主體靜態清單內的 gate、第 2 條測必被拒的寫入指令。第 1 條被拒 → 清單與實作不同步或落點錯了；第 2 條被准 → **立即停用 kit**（提權漏洞，不是可用性問題），並引用該規則出自哪個檔案、哪個陣列位置。
 6. 「例外 allow」（先 deny 家族、再 allow 例外，如 §7.1 的 `--frozen-lockfile` 寫法）**只准許出現在主體自己的陣列**；專案端拿它就違反第 2 點，`setup` 必須拒絕。
 7. **設定檔與 `.git/` 的寫入權只屬於 `setup`**：orchestrator（`edit deny *`）、developer（deny `*opencode.json`、`*opencode.jsonc`、`*.opencode/*`、**`*.git/*`**）、reviewer（`edit deny *`）。developer 的 deny 必須排在它自己的 `allow *` 之後（permission-spec.md §7.3.1 事實 4、permission-spec.md §7.3.2），並**已由 `experiments.md` 第 6 題實測**：根相對、根絕對、`.opencode` 相對、worktree 內副本、`opencode.jsonc`、`.git\hooks\` **六種形全數被拒**；acceptance.md §13 關卡 1 由「首次驗證」降為「回歸抽驗」。
 
@@ -113,3 +123,13 @@ developer 的尾巴群（逐條展開、**不含 pipe**；依 §7.1 三段式排
 3. 對每一條要 allow 的指令，用 `question` 讓你看著展開後的實際命令逐條批准（`auto` 模式下：只 allow 「展開後不含任何寫入性選項」的指令，其餘留 `TBD` 並在結束時逐條列出）。
 4. allow 一律採 `"實指令 子命令 *"` 形（permission-spec.md §7.3.2）；`npm run <script> *` 這類「一個 allow 涵蓋所有 script」的寫法**禁止**，要逐 script 展開（`npm run build *`、`npm run test:unit *`），否則 `npm run lint *` 會被附加 `-- --fix` 繞過。專案端追加的每一條還要過 permission-spec.md §7.3.4 第 2、3 點的「不得命中主體尾巴第 1、2 段」比對。
 5. 仍需記得：即使指令被 allow，agent 仍可傳 `npm run lint -- --fix` 這種「參數延伸」——所以**主體的「白名單只放行唯讀用法」提示詞紀律（§7.2）是第一道牆**，`profile` 只 allow 具名 script 是第二道牆，`inspect [probe]` 與 reviewer 的 diff 檢查是第三道牆。三道牆都要寫進文件，不宣稱「權限已擋死」。
+
+#### 7.3.5#2 POSIX 寫入／刪除／執行族（權威清單）
+
+> 本清單是 `## 指令`／`## 額外 shell` 寫入性檢查與各 agent 尾巴第 1 段的**唯一正典**（P14，2026-11-14 雙平台）；主檔 §5.1.2／§7.1 只連結本節、不重列。`setup` 的 gate 寫入性檢查遇到下列字面 → 一律標 `需人工確認（疑似可寫入）`、**拒絕 allow**；agent 尾巴第 1 段對應 deny。
+
+- **檔案系統寫刪**：`rm *`、`mv *`、`touch *`、`mkdir *`、`rmdir *`、`sed -i *`、`dd *`、`tee *`、`chmod *`、`chown *`、`chgrp *`、`xattr *`、`truncate *`
+- **任意執行／動態求值**：`sh -c *`、`bash -c *`、`zsh -c *`、`node -e *`、`python -c *`、`python3 -c *`、`perl -e *`、`ruby -e *`、`php -r *`
+- **不得列入**：`ln -s`、`unlink`、`cp`（三者有窄化 allow 需求——`ln -s ../../node_modules .worktrees/*/node_modules`、`unlink .worktrees/*/node_modules`、`cp * .worktrees/*`；進 deny 族會被尾巴翻掉 allow）。
+
+> 註：`rmdir *` 與既有 allow `cmd /c rmdir .worktrees/*` 不衝突——R1 第 7 題證明 scanner 對 `cmd /c …` 按整串比對、不拆出 `rmdir` 子指令；若關卡 1 實測出現誤拒，以實測為準回報修訂。

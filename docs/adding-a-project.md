@@ -36,11 +36,13 @@
 
 | 值 | 條件 |
 |---|---|
-| `junction` | 主工作區**已有** `node_modules`；worktree 連結回主工作區（Windows junction） |
+| `junction` | 主工作區**已有** `node_modules`；worktree 連結回主工作區（Windows junction／macOS 固定相對 symlink `../../node_modules`，P4） |
 | `install-per-worktree` | 沒有 `node_modules`，或 lockfile 需要可重現安裝（`npm ci`） |
 | `none` | 不建 worktree，或不需要依賴 |
 
-**先驗規則**：主工作區沒有 `node_modules` 時**不要**選 `junction`——`Resolve-Path node_modules` 取不到，會在 worktree 建好之後才失敗。
+**先驗規則**：主工作區沒有 `node_modules` 時**不要**選 `junction`——先驗檢查（Windows `Test-Path node_modules`／macOS `test -e node_modules`）會擋下；否則建立連結時取不到目標（Windows 的 `Resolve-Path node_modules` 失敗），要到 worktree 建好之後才爆。
+
+> **P11（2026-11-14 breaking change）**：`worktree 目錄` 只接受 `.worktrees/`、審核前綴只接受 `review-`；填其他值 `init`／`inspect` 會拒絕並指明合法值，不自動改寫。
 
 ### 2c. `## 啟用規則`（要套哪些 pack）
 
@@ -133,3 +135,5 @@ src/components/Example.vue：vue/no-v-html（既有 warning，短期內不改；
 | `--working` 審核看到 `.opencode/` | 尚未把 kit 設定納入版控（commit 一次即可），或請 agent 明確排除 |
 | 回報說「某指令沒權限」 | 先讓它拆成單條重試；複合指令被拒不代表單條不可用 |
 | agent 清單多出沒看過的 `frontend-devkit/...` | `agents` 的鍵拼錯：OpenCode 會建立一個無 system prompt、權限 `*/* allow` 的 primary agent。用 `opencode debug agents` 確認後改掉 |
+| macOS 上 `pwd` 被拒 | 設計如此：allow 只登記 `pwd -P`、未登記 `pwd`（P12）；落點一律 `pwd -P` 與 `git rev-parse --show-toplevel` 比對 |
+| macOS 上 symlink 指向錯誤 | `junction` 的 symlink 目標固定 `../../node_modules`，依賴「worktree 目錄＝`.worktrees/`」；填其他目錄會被 `init` 拒絕（P11） |

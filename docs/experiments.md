@@ -1,4 +1,4 @@
-# R1 實測結果（2026-11-11，OpenCode v2.2.7／Windows／PowerShell）
+# R1 實測結果（2026-11-11，OpenCode v2.2.7／Windows／PowerShell；Windows 歷史）
 
 實驗場：`%USERPROFILE%\AI\r1-probe`（探測專案）＋暫放全域的三個探測 agent（`agents/r1probe/probeA|B|C`，跑完已刪除；全域 `opencode.json` 已自備份還原）。
 手法：agent 的 `permissions` 用**不存在的假指令**（`zzstatus`／`zzpkg`／`zzmd`／`zzjson`／`zzbad`）做地板 deny＋窄域 allow，再命它「照原字串執行」；**有送到 shell（即使回「無法辨識指令」）＝EXECUTED＝allow 生效**，被權限擋＝DENIED。假指令不會真的執行任何事，所以零副作用。
@@ -35,3 +35,48 @@
 3. §5.1.1#1：探針改 `Get-Location`（PowerShell 獨有、無 `$`），`cmd /c ver` 交叉驗證；`$PSVersionTable` 形列入「不可用」清單。
 4. §7.1／§9.6：allow 只寫**斜線形**（實測會正規化）；程序檔的 `cmd /c` 指令**保留反斜線**（cmd 語法要求）。兩形並列的妥協撤銷。
 5. §7.3.2／§15 R1：把「字面完全同形」升為語法紀律（第 5 題），並把 R1 從「待實測」改為「已實測，剩第 2 節 #2 那條待 TUI 覆驗」。
+
+---
+
+# R2：2026-11-14 macOS 實測
+
+環境：OpenCode v2.2.7、Darwin 25.5.0（macOS arm64）、zsh。shell 落點為本 kit repo（路徑以 `<repo>` 表示）。探針方式：建立臨時 agent `zzprobe/posix` 與 `zzprobe/narrow`，用假指令／無副作用指令測權限，跑完刪除。
+
+## 一、POSIX scanner 實測表
+
+| 指令 | 結果 | 意義 |
+|---|---|---|
+| `pwd -P` | EXECUTED | POSIX 落點的正式 allow 條目 |
+| `pwd` | DENIED | 未登記即被拒；證明 allow 是字面比對，不能拿 `pwd` 代替 `pwd -P`（P12） |
+| `uname -s` | EXECUTED（`Darwin`） | shell／OS 偵測可用 |
+| `test -e .` | EXECUTED | 存在性檢查可用（shell builtin 也能被 scanner 匹配） |
+| `shasum -a 256 .gitignore` | EXECUTED | checksum 可用 |
+| `cp .gitignore .worktrees/zzprobe/.gitignore` | EXECUTED（目的地不存在而失敗） | 權限放行；`cp` 可用 |
+| `ln -s ../../node_modules .worktrees/zzprobe/node_modules` | EXECUTED（目的地不存在而失敗） | 固定來源的相對 symlink 權限可用 |
+| `unlink .worktrees/zzprobe/node_modules` | EXECUTED（不存在而失敗） | 只移除連結的指令可用 |
+| `grep -n "a b" .gitignore` | EXECUTED | 引號參數可匹配 allow |
+| `git commit --allow-empty -m probe` | DENIED | 真地板在 macOS 仍有效 |
+| `rm .worktrees/zzprobe/zz` | DENIED | `rm` 仍被擋 |
+| `ln -s /etc/passwd .worktrees/zzprobe/passwd` | DENIED | 固定來源＋窄化目的地擋掉任意 symlink |
+| `unlink .worktrees/zzprobe/passwd` | DENIED | 窄化 pattern 擋掉非 node_modules 的刪除 |
+
+## 二、路徑別名實測（`mktemp -d` 建的專案）
+
+- `pwd` → `/var/folders/...`；`pwd -P` → `/private/var/folders/...`。
+- `git rev-parse --show-toplevel` → `/private/var/folders/...`。
+- 因此落點比對必須用 `pwd -P`；用 `pwd` 會把合法的實體路徑誤判成落點不符。
+
+## 三、symlink＋`git worktree remove --force` 實測
+
+用暫存 git repo 實測：
+
+- `.worktrees/test/node_modules → ../../node_modules` 建立成功，`test -e .../fakepkg/package.json` 為真。
+- `unlink` 後主工作區 `node_modules` 完好。
+- 直接 `git worktree remove --force`（未先 unlink）後主工作區 `node_modules` 仍完好；保留 unlink 第一步是防禦性設計（P5），不是 macOS 的必要條件。
+
+## 四、報表
+
+1. 探針結論：POSIX 指令可用同一套「靜態白名單、字面同形、尾巴三段式」管理；`pwd -P` 取代 `pwd` 成為落點 allow（P12）。
+2. `ln`／`unlink` 的窄化 pattern 實測有效（P8）：固定來源 `../../node_modules`、目的地限定 `.worktrees/*/node_modules`，擋下任意 symlink 與非 node_modules 的刪除。
+3. `uname -s` → `Darwin`、`Get-Location` 在 zsh 下不可用——`setup` 的偵測順序「先 `uname`、後 `Get-Location`」不可顛倒。
+4. 上述結論已定稿於 `docs/specs/2026-11-14-macos-compatibility-design.md` §4.1／§7.1；後續 TUI 關卡驗收另見 `docs/acceptance.md` §13.2。
