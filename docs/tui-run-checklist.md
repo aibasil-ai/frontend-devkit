@@ -2,6 +2,8 @@
 
 **為什麼要你跑**：實測證明 `opencode` 的 shell 在 service 綁定的專案目錄執行，`--server`／`--standalone`／呼叫端 cwd 都改不了它（`acceptance-findings.md`）。自動驅動會去改你正在用的專案，所以關卡 2～7 請你在 TUI 手動跑，把輸出貼給我判讀與記錄。
 
+> macOS 的動態關卡請搭配 [`tui-dynamic-checklist.md`](tui-dynamic-checklist.md)（逐項打勾）與 [`tui-dynamic-record-template.md`](tui-dynamic-record-template.md)（實測記錄模板）；本檔的 Windows 步驟保留不動。
+
 **kit 已專案區安裝**在兩個評測專案的 `.opencode/` 下（`agents/frontend-devkit/*`、`commands/frontend-devkit/*`、`frontend-devkit/{rules,profile,worktree.procedures.md}`），**沒有碰你的全域設定**。`project.md` 兩邊都還沒產生（由 init 建）。
 
 > **每次 kit 檔案有改動，務必「重啟 TUI 進程」再跑**（不是只開新 tab／新對話）。agent 定義是在進程啟動時載入的，開新 session 不一定會重讀檔案——第 6 站關卡 7 就因此出現一次假訊號：檔案已是新版，跑出來的仍是舊行為（缺陷 AH）。

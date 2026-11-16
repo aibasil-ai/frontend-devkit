@@ -1,6 +1,8 @@
 # TUI 動態驗證 checklist（macOS / posix）
 
 > 目的：在 app-a / app-b 的 TUI 上逐項驗證 `frontend-devkit` 的動態行為。此清單依關卡 1–8 編排，適用於 macOS zsh / bash / sh（`shell: posix`）環境。
+>
+> 要邊跑邊留紀錄，搭配 [`tui-dynamic-record-template.md`](tui-dynamic-record-template.md)（每關都有「實際輸出／判定／證據」欄位）。
 
 ## 前置條件
 
